@@ -1,5 +1,5 @@
 # Dataset creation for blockmodel analysis
-# September 16, 2022
+# Created: September 16, 2022
 # Tyler Barrett
 
 
@@ -95,7 +95,6 @@ volume_intersection <- read_csv(paste0(fp, "/EEID_Data_public/network_edge_data/
 volume_intersection <- volume_intersection %>%
   filter(!grepl(".Z", id1)) %>% # filter to only humans
   filter(!grepl(".Z", id2)) %>%
-  slice_max(VI_95, prop = 0.05) %>% # identify the op 5% of overlap based on VI_95
   select(id1, id2, VI_95) %>%
   mutate(id1 = sub("A.SNH", "A-SNH", id1)) %>% # change "." to "-"
   mutate(id2 = sub("A.SNH", "A-SNH", id2)) %>%
@@ -103,6 +102,13 @@ volume_intersection <- volume_intersection %>%
   mutate(id2 = sub("D.SNH", "D-SNH", id2)) %>%
   rename(ego_id = id1, alter_id = id2, value_of_tie = VI_95) %>%
   mutate(relation = "home_range")
+
+# create list of individuals with gps data
+id_list_gps <- unique(c(volume_intersection$ego_id, volume_intersection$alter_id))
+
+# identify the top 5% of overlap based on VI_95
+volume_intersection <- volume_intersection %>%
+  slice_max(VI_95, prop = 0.05)
 
 # plot the network
 volume_intersection_edgelist <- volume_intersection %>%
@@ -302,3 +308,43 @@ edgelist <- bind_rows(edgelist, common_crops_edgelist)
 ########################
 
 write_csv(edgelist, file = "blockmodel_dataset.csv")
+
+#################################
+## create participation indicator
+#################################
+
+participation_indicator_df <- tibble(id = unique(c(edgelist$ego_id, edgelist$alter_id)))
+
+participation_indicator_df <- participation_indicator_df %>%
+  mutate(freetime = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(freetime = if_else(grepl("uid", participation_indicator_df$id), 0, freetime)) %>%
+  mutate(food_help_received = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(food_help_received = if_else(grepl("uid", participation_indicator_df$id), 0, food_help_received)) %>%
+  mutate(food_help_provided = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(food_help_provided = if_else(grepl("uid", participation_indicator_df$id), 0, food_help_provided)) %>%
+  mutate(farm_help_received = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(farm_help_received = if_else(grepl("uid", participation_indicator_df$id), 0, farm_help_received)) %>%
+  mutate(farm_help_provided = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(farm_help_provided = if_else(grepl("uid", participation_indicator_df$id), 0, farm_help_provided)) %>%
+  mutate(home_range = if_else(id %in% volume_intersection_edgelist, 1, 0)) %>%
+  mutate(shared_activity = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(common_animals = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(common_crops = if_else(id %in% demo_df$social_netid, 1, 0)) %>%
+  mutate(mandena = if_else(grepl("A-", participation_indicator_df$id), 1, 0)) %>% # add village indicator 
+  mutate(sarahandrano = if_else(grepl("D-", participation_indicator_df$id), 1, 0))
+
+write_csv(participation_indicator_df, file = "participation_indicator.csv")
+
+
+##############################################
+## create shared vector and activities dataset
+##############################################
+  
+shared_vectors_activities <- common_animals_df %>%
+    full_join(main_activity_df) %>%
+    replace(is.na(.), 0)
+  
+write_csv(shared_vectors_activities, file = "shared_vectors_activities.csv")
+  
+  
+  
