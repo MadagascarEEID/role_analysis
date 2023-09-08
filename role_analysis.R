@@ -110,10 +110,7 @@ for (i in names(net_data)) {
 ################
 
 # run for loop to iterate role analysis function over netwrite object for each village
-
-### checking w/ Tom on why for loop is producing error, works fine without the loop
-
-role_analysis_list <- vector("list", length(netwrite_list))
+role_analysis_list <- list()
 for (i in names(netwrite_list)) {
   village <- netwrite_list[[i]]
   
@@ -145,17 +142,4 @@ for (i in names(netwrite_list)) {
     clustering_variables = clustering_variables
   )
 }
-
-
-
-role_analysis(graph = network_list,
-              nodes = node_measures,
-              directed = TRUE,
-              method = "cluster",
-              min_partitions = 2,
-              max_partitions = 10,
-              viz = TRUE,
-              retain_variables = TRUE,
-              cluster_summaries = TRUE)
-
 
