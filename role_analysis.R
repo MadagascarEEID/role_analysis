@@ -331,10 +331,10 @@ man_summary_plot_1 <- gridExtra::grid.arrange(grobs = list(man_triad_plots$clust
 man_summary_plot_2 <- gridExtra::grid.arrange(grobs = list(man_triad_plots$cluster_4, man_triad_plots$cluster_5, man_triad_plots$cluster_6,
                                                            man_degree_plots$cluster_4, man_degree_plots$cluster_5, man_degree_plots$cluster_6),
                                               ncol = 3, nrow = 2)
-sara_summary_plot <- gridExtra::grid.arrange(grobs = list(sara_triad_plots$cluster_1, sara_triad_plots$cluster_1, sara_triad_plots$cluster_3,
+sara_summary_plot <- gridExtra::grid.arrange(grobs = list(sara_triad_plots$cluster_1, sara_triad_plots$cluster_2, sara_triad_plots$cluster_3,
                                                            sara_degree_plots$cluster_1, sara_degree_plots$cluster_2, sara_degree_plots$cluster_3),
                                               ncol = 3, nrow = 2)
-andat_summary_plot <- gridExtra::grid.arrange(grobs = list(andat_triad_plots$cluster_1, andat_triad_plots$cluster_1, andat_triad_plots$cluster_3,
+andat_summary_plot <- gridExtra::grid.arrange(grobs = list(andat_triad_plots$cluster_1, andat_triad_plots$cluster_2, andat_triad_plots$cluster_3,
                                                             andat_degree_plots$cluster_1, andat_degree_plots$cluster_2, andat_degree_plots$cluster_3),
                                                ncol = 3, nrow = 2)
 
@@ -451,6 +451,11 @@ m1_plot <- jtools::effect_plot(man_human, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "maroon")
 
+m1_plot <- m1_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
+
 man_dog <- glm(dog_hookworm ~
                     age +
                     gender +
@@ -466,6 +471,11 @@ m2_plot <- jtools::effect_plot(man_dog, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "maroon")
 
+m2_plot <- m2_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
+
 sara_human <- glm(human_hookworm ~
                    age +
                    gender +
@@ -479,6 +489,11 @@ summary(sara_human)
 m3_plot <- jtools::effect_plot(sara_human, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "darkorange")
+
+m3_plot <- m3_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
 
 sara_dog <- glm(dog_hookworm ~
                  age +
@@ -495,6 +510,11 @@ m4_plot <- jtools::effect_plot(sara_dog, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "darkorange")
 
+m4_plot <- m4_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
+
 andat_human <- glm(human_hookworm ~
                     age +
                     gender +
@@ -508,6 +528,11 @@ summary(andat_human)
 m5_plot <- jtools::effect_plot(andat_human, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "navy")
+
+m5_plot <- m5_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
 
 andat_dog <- glm(dog_hookworm ~
                   age +
@@ -524,11 +549,16 @@ m6_plot <- jtools::effect_plot(andat_dog, cluster_assignment,
                                x.label = "Cluster", y.label = "Predicted Probability of Infection",
                                colors = "navy")
 
+m6_plot <- m6_plot +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20))
+
 # combine model plots
 model_plots <- gridExtra::grid.arrange(grobs = list(m1_plot, m3_plot, m5_plot,
                                                     m2_plot, m4_plot, m6_plot),
                                               ncol = 3, nrow = 2)
-ggsave("model_plots.pdf", model_plots, width = 15, height = 10)
+ggsave("model_plots.pdf", model_plots, width = 15, height = 11)
 
 
 ## EXTRA CODE ##
