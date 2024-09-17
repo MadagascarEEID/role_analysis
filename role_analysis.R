@@ -1,17 +1,29 @@
-# Role analysis script
+# Role Analysis of Madagascar NIH Social Network Data
 # Created: September 07, 2023
 # Tyler Barrett
 
-# load packages
-library(tidyverse)
-library(ideanet)
 
-############
-## Functions
-############
+#######################################
+#   LOAD PACKAGES AND SET FILE PATH   #
+#######################################
 
-# little prevalence computer
-prevalence <- function(data, parasite, group_type = NULL, group_name = NULL){
+# Load Packages
+  library(tidyverse)
+  library(ideanet)
+
+# set File Path
+  if (paste(Sys.info()[[1]], collapse=" ") == "Windows"){
+  fp <- "C:/Users/tmbar/Box"
+}else{
+  fp <- "/Users/tylerbarrett/Library/CloudStorage/Box-Box"
+}
+
+#################
+#   FUNCTIONS   #
+#################
+
+# Prevalence Computer
+  prevalence <- function(data, parasite, group_type = NULL, group_name = NULL){
   
   # compute overall prevalence if group argument is missing
   
@@ -43,8 +55,8 @@ prevalence <- function(data, parasite, group_type = NULL, group_name = NULL){
   print(result)
 }
 
-# function to make degree centrality summary plots
-degree_plot <- function(summary_df, cluster_list) {
+# Make Degree Centrality Summary Plots
+  degree_plot <- function(summary_df, cluster_list) {
   
   # make dataframe with mean degree
   degree_df <- summary_df %>%
@@ -86,8 +98,8 @@ degree_plot <- function(summary_df, cluster_list) {
   return(degree_plot_list)
 }
 
-# function to make triad summary plots
-triad_plot <- function(summary_df, cluster_list) {
+# Make Triad Summary Plots
+  triad_plot <- function(summary_df, cluster_list) {
   
   # make dataframe with mean degree
   triad_df <- summary_df %>%
@@ -124,8 +136,8 @@ triad_plot <- function(summary_df, cluster_list) {
   return(triad_plot_list)
 }
 
-# function to extract summary edgelist from role analysis results
-summary_el_extracter <- function(village_name) {
+# Extract Summary Edgelist from Role Analysis Results
+  summary_el_extracter <- function(village_name) {
   
   # extract cluster assignments
   net_data[[village_name]]$nl <- net_data[[village_name]]$nl %>%
@@ -149,145 +161,134 @@ summary_el_extracter <- function(village_name) {
   return(list(cluster_n = cluster_n, el = el))
 }
 
-###################################
-## Create nodelist for each village
-###################################
+#########################################
+#   CREATE NODE LIST FOR EACH VILLAGE   #
+#########################################
 
-# read in demographic data
-demo_df <- read_csv("/Users/tylerbarrett/Library/CloudStorage/Box-Box/EEID_Data_public/clean_data_tables/Survey_Demographic_Health.csv")
+# Read in Demographic Data
+  demo_df <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Survey_Demographic_Health.csv"))
 
-# select relevant variables - just basic demographics for now
-demo_df <- demo_df %>%
-  select(social_netid, village, gender, age, school_level, main_activity)
+# Select Relevant Variables - Just Basic Demographics for Now
+  demo_df <- demo_df %>%
+    select(social_netid, village, gender, age, school_level, main_activity)
 
-# separate nodelists for each village
-nl_mandena <- demo_df %>%
-  filter(village == "Mandena")
-nl_sarahandrano <- demo_df %>%
-  filter(village == "Sarahandrano")
-nl_andatsakala <- demo_df %>%
-  filter(village == "Andatsakala" | village == "Ampandrana")
+# Separate Node Lists for Each Village
+  nl_mandena <- demo_df %>%
+    filter(village == "Mandena")
+  nl_sarahandrano <- demo_df %>%
+    filter(village == "Sarahandrano")
+  nl_andatsakala <- demo_df %>%
+    filter(village == "Andatsakala" | village == "Ampandrana")
 
-##################################
-## Create multirelational edgelist
-##################################
+#######################################
+#   CREATE MULTIRELATIONAL EDGELIST   #
+#######################################
 
-# read in the naming network (freetime, farming help, food help) edge data
-name_table <- read_csv("/Users/tylerbarrett/Library/CloudStorage/Box-Box/EEID_Data_public/network_edge_data/Name_Table.csv")
+# Read in Naming Network (Freetime, Farming Help, Food Help) Edge Data
+  name_table <- read_csv(paste0(fp, "/EEID_Data_public/network_edge_data/Name_Table.csv"))
 
-# create multirelational edgelist from naming network data
-edgelist <- name_table %>%
-  select(social_netid, named_person_social_netid, network_question_number) %>%
-  rename(relation = network_question_number, ego_id = social_netid,
-         alter_id = named_person_social_netid) %>%
-  mutate(value_of_tie = 1, .after = alter_id) %>%
-  mutate(relation = recode(relation, `1` = "freetime", `2` = "farm_help_received",
-                           `3` = "farm_help_provided", `4` = "food_help_received",
-                           `5` = "food_help_provided")) %>%
-  filter(!grepl("uid", alter_id)) %>% # exclude edges where non-participant is named
-  filter(ego_id != alter_id) # remove self loops
+# Create Multirelational Edgelist from Naming Network Data
+  edgelist <- name_table %>%
+    select(social_netid, named_person_social_netid, network_question_number) %>%
+    rename(relation = network_question_number, ego_id = social_netid,
+           alter_id = named_person_social_netid) %>%
+    mutate(value_of_tie = 1, .after = alter_id) %>%
+    mutate(relation = recode(relation, `1` = "freetime", `2` = "farm_help_received",
+                             `3` = "farm_help_provided", `4` = "food_help_received",
+                             `5` = "food_help_provided")) %>%
+    filter(!grepl("uid", alter_id)) %>% # exclude edges where non-participant is named
+    filter(ego_id != alter_id) # remove self loops
 
-# create separate edgelists for each village
-el_mandena <- edgelist %>%
-  filter(grepl("A.SNH", ego_id))
-el_sarahandrano <- edgelist %>%
-  filter(grepl("D.SNH", ego_id))
-el_andatsakala <- edgelist %>%
-  filter(grepl("E.SNH", ego_id))
+# Create Separate Edgelists for Each Village
+  el_mandena <- edgelist %>%
+    filter(grepl("A.SNH", ego_id))
+  el_sarahandrano <- edgelist %>%
+    filter(grepl("D.SNH", ego_id))
+  el_andatsakala <- edgelist %>%
+    filter(grepl("E.SNH", ego_id))
 
-##################################
-## Reformat data for role analysis
-##################################
+#######################################
+#   REFORMAT DATA FOR ROLE ANALYSIS   #
+#######################################
 
-# create a list object containing nodelist and edgelist for each village
-net_data <- list(mandena = list(nl = nl_mandena,
-                                el = el_mandena),
-                 sarahandrano = list(nl = nl_sarahandrano,
-                                     el = el_sarahandrano),
-                 andatsakala = list(nl = nl_andatsakala,
-                                    el = el_andatsakala))
+# Create a List Object Containing Nodelist and Edgelist for Each Village
+  net_data <- list(mandena = list(nl = nl_mandena,
+                                  el = el_mandena),
+                   sarahandrano = list(nl = nl_sarahandrano,
+                                       el = el_sarahandrano),
+                   andatsakala = list(nl = nl_andatsakala,
+                                      el = el_andatsakala))
 
-# run for loop to iterate netwrite function over data for each village
-netwrite_list <- list()
-for (i in names(net_data)) {
-  village <- net_data[[i]]
+# Iterate Netwrite Function Over Data for Each Village
+  netwrite_list <- list()
+  for (i in names(net_data)) {
+    village <- net_data[[i]]
+    
+    # Execute Netwrite Function
+      output <- netwrite(nodelist = village$nl,
+                         node_id = "social_netid",
+                         i_elements = village$el$ego_id,
+                         j_elements = village$el$alter_id,
+                         type = village$el$relation,
+                         directed = TRUE)
+    
+    # Add Netwrite Output to a List
+      netwrite_list[[i]] <- list(
+        network = output$network,
+        igraph_list = output$igraph_list,
+        largest_bi_component = output$largest_bi_component,
+        largest_component = output$largest_component,
+        node_measure_plot = output$node_measure_plot,
+        node_measures = output$node_measures,
+        edgelist = output$edgelist,
+        system_level_measures = output$system_level_measures,
+        system_measure_plot = output$system_measure_plot
+    )
+  }
+
+####################
+#   ROLE ANALYSIS  #
+####################
+
+# Set Clustering Parameters
+min = 6 # Minimum Number of Partitions
+max = 20 # Maximum Number of Partitions
+
+# Initialize List to Store Output for Each Village
+  role_analysis_list <- vector("list", length(netwrite_list))
+
+# Iterate Role Analysis Function Over Netwrite Object for Each Village
+    for (i in seq_along(netwrite_list)) {
+      village <- netwrite_list[[i]]
+    
+    # Execute Role Analysis Function
+      output <- role_analysis(graph = village$igraph_list,
+                              nodes = village$node_measures,
+                              directed = TRUE,
+                              method = "cluster",
+                              min_partitions = min,
+                              max_partitions = max,
+                              min_partition_size = 5,
+                              viz = TRUE,
+                              retain_variables = TRUE,
+                              cluster_summaries = TRUE)
+    
+    # Add Role Analysis Output to the list
+      role_analysis_list[[i]] <- list(
+        cluster_assignments = output$cluster_assignments,
+        cluster_dendrogram = output$cluster_dendrogram,
+        cluster_modularity = output$cluster_modularity,
+        cluster_relations_heatmaps = output$cluster_relations_heatmaps,
+        cluster_relations_sociogram = output$cluster_relations_sociogram,
+        cluster_sociogram = output$cluster_sociogram,
+        cluster_summaries = output$cluster_summaries,
+        cluster_summaries_cent = output$cluster_summaries_cent,
+        cluster_summaries_correlations = output$cluster_summaries_correlations,
+        cluster_summaries_triad = output$cluster_summaries_triad,
+        clustering_variables = output$clustering_variables
+    )
+    }
   
-  # execute netwrite function
-  
-  netwrite(nodelist = village$nl,
-           node_id = "social_netid",
-           i_elements = village$el$ego_id,
-           j_elements = village$el$alter_id,
-           type = village$el$relation,
-           directed = TRUE)
-  
-  # add netwrite output to a list
-  
-  netwrite_list[[i]] <- list(
-    bicomponent_list = bicomponent_list,
-    edgelist = edgelist,
-    edgelist_list = edgelist_list,
-    largest_bi_component = largest_bi_component,
-    largest_component = largest_component,
-    largest_component_list = largest_component_list,
-    network = network,
-    network_list = network_list,
-    node_measure_plot = node_measure_plot,
-    node_measure_plot_list = node_measure_plot_list,
-    node_measures = node_measures,
-    node_measures_list = node_measures_list,
-    system_level_measures = system_level_measures,
-    system_level_measures_list = system_level_measures_list,
-    system_measure_plot = system_measure_plot,
-    system_measure_plot_list = system_measure_plot_list,
-    this_igraph = this_igraph
-  )
-}
-
-################
-## Role analysis
-################
-
-# set clustering parameters
-min = 2 # minimum number of partitions
-max = 10 # maximum number of partitions
-min_cluster_size = 10 # minimum number of individuals per cluster
-
-# run for loop to iterate role analysis function over netwrite object for each village
-role_analysis_list <- list()
-for (i in names(netwrite_list)) {
-  village <- netwrite_list[[i]]
-  
-  # execute role analysis function
-  
-  role_analysis(graph = village$network_list,
-                nodes = village$node_measures,
-                directed = TRUE,
-                method = "cluster",
-                min_partitions = min,
-                max_partitions = max,
-                min_partition_size = 10,
-                viz = TRUE,
-                retain_variables = TRUE,
-                cluster_summaries = TRUE)
-  
-  # add role analysis output to a list
-  
-  role_analysis_list[[i]] <- list(
-    cluster_assignments = cluster_assignments,
-    cluster_dendrogram = cluster_dendrogram,
-    cluster_modularity = cluster_modularity,
-    cluster_relations_heatmaps = cluster_relations_heatmaps,
-    cluster_relations_sociogram = cluster_relations_sociogram,
-    cluster_sociogram = cluster_sociogram,
-    cluster_summaries = cluster_summaries,
-    cluster_summaries_cent = cluster_summaries_cent,
-    cluster_summaries_correlations = cluster_summaries_correlations,
-    cluster_summaries_triad = cluster_summaries_triad,
-    clustering_variables = clustering_variables
-  )
-}
-
 # loop over each village and extract summary edgelist
 villages <- c("mandena", "sarahandrano", "andatsakala")
 summary_el <- list()
