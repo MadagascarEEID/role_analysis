@@ -256,6 +256,7 @@ max = 20 # Maximum Number of Partitions
 
 # Initialize List to Store Output for Each Village
   role_analysis_list <- vector("list", length(netwrite_list))
+  names(role_analysis_list) <- names(netwrite_list)
 
 # Iterate Role Analysis Function Over Netwrite Object for Each Village
     for (i in seq_along(netwrite_list)) {
@@ -266,8 +267,8 @@ max = 20 # Maximum Number of Partitions
                               nodes = village$node_measures,
                               directed = TRUE,
                               method = "cluster",
-                              min_partitions = min,
-                              max_partitions = max,
+                              min_partitions = 6,
+                              max_partitions = 20,
                               min_partition_size = 5,
                               viz = TRUE,
                               retain_variables = TRUE,
@@ -288,6 +289,9 @@ max = 20 # Maximum Number of Partitions
         clustering_variables = output$clustering_variables
     )
     }
+  
+# Save Output
+# saveRDS(role_analysis_list, "role_output.rds")
   
 # loop over each village and extract summary edgelist
 villages <- c("mandena", "sarahandrano", "andatsakala")
