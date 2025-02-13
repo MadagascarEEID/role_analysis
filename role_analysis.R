@@ -558,47 +558,113 @@
     left_join(virscan, by = join_by(social_netid)) %>%
     filter(!is.na(species_richness))
   
-# characterize viral Exposure by Role Type...
-  exposure_summary_table <- demo_df %>%
-    select(group, social_netid, c(9:343)) %>% 
-    pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
-    complete(group, virus, fill = list(positive = 0)) %>%
-    group_by(group, virus) %>%
-    summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
-    left_join(
-      demo_df %>%
-        select(group, social_netid) %>%
-        distinct() %>%
-        group_by(group) %>%
-        summarise(sample_size = n_distinct(social_netid)), 
-      by = "group"
-    ) %>%
-    mutate(percentage = (count / sample_size) * 100) %>%
-    group_by(virus) %>%
-    filter(sum(percentage > 0) > 0) %>% 
-    arrange(group, virus)
+# characterize viral Exposure by Role Type
+  # Relevel Groups
+    demo_df <- demo_df %>%
+      mutate(group = factor(group, levels = c("Periphery", "Core", "MostPopular")))
+    
+  # Plot Species Richness
+    hist(demo_df$species_richness)
+    ggplot(demo_df, aes(x = group, y = species_richness, color = village)) +
+      geom_boxplot() +
+      geom_point(position = position_jitter(width = 0.2)) +
+      labs(x = "Group", y = "Species Richness") +
+      theme_minimal() +
+      facet_wrap(~ village, scales = "free") 
   
-  ggplot(exposure_summary_table, aes(x = group, y = virus, fill = percentage)) +
-    geom_tile() +
-    scale_fill_gradient(low = "white", high = "blue") +
-    theme_minimal() +
-    labs(title = "Viral Exposure by Role Type",
-         x = "Role Type",
-         y = "Virus Species",
-         fill = "Percent Exposed") +
-    theme(axis.text.x = element_text(hjust = 1))
+  # Plot Species Prevalence by Role  
+    # Both Villages Combined
+      exposure_summary_all_villages_df <- demo_df %>%
+        select(group, social_netid, c(9:343)) %>% 
+        pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
+        complete(group, virus, fill = list(positive = 0)) %>%
+        group_by(group, virus) %>%
+        summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
+        left_join(
+          demo_df %>%
+            select(group, social_netid) %>%
+            distinct() %>%
+            group_by(group) %>%
+            summarise(sample_size = n_distinct(social_netid)), 
+          by = "group"
+        ) %>%
+        mutate(percentage = (count / sample_size) * 100) %>%
+        group_by(virus) %>%
+        filter(sum(percentage > 0) > 0) %>% 
+        arrange(group, virus)
+      
+      ggplot(exposure_summary_all_villages_df, aes(x = group, y = virus, fill = percentage)) +
+        geom_tile() +
+        scale_fill_gradient(low = "white", high = "maroon") +
+        theme_minimal() +
+        labs(title = "Viral Exposure by Role Type",
+             x = "Role Type",
+             y = "Virus Species",
+             fill = "Percent Exposed") +
+        theme(axis.text.x = element_text(hjust = 1))
+      
+      # Sarahandrano
+        exposure_summary_sara_df <- demo_df %>%
+          filter(village == "Sarahandrano") %>%
+          select(group, social_netid, c(9:343)) %>% 
+          pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
+          complete(group, virus, fill = list(positive = 0)) %>%
+          group_by(group, virus) %>%
+          summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
+          left_join(
+            demo_df %>%
+              select(group, social_netid) %>%
+              distinct() %>%
+              group_by(group) %>%
+              summarise(sample_size = n_distinct(social_netid)), 
+            by = "group"
+          ) %>%
+          mutate(percentage = (count / sample_size) * 100) %>%
+          group_by(virus) %>%
+          filter(sum(percentage > 0) > 0) %>% 
+          arrange(group, virus)
+        ggplot(exposure_summary_sara_df, aes(x = group, y = virus, fill = percentage)) +
+          geom_tile() +
+          scale_fill_gradient(low = "white", high = "maroon") +
+          theme_minimal() +
+          labs(title = "Viral Exposure by Role Type",
+               x = "Role Type",
+               y = "Virus Species",
+               fill = "Percent Exposed") +
+          theme(axis.text.x = element_text(hjust = 1))
+        
+      # Andatsakala  
+        exposure_summary_andat_df <- demo_df %>%
+          filter(village == "Andatsakala") %>%
+          select(group, social_netid, c(9:343)) %>% 
+          pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
+          complete(group, virus, fill = list(positive = 0)) %>%
+          group_by(group, virus) %>%
+          summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
+          left_join(
+            demo_df %>%
+              select(group, social_netid) %>%
+              distinct() %>%
+              group_by(group) %>%
+              summarise(sample_size = n_distinct(social_netid)), 
+            by = "group"
+          ) %>%
+          mutate(percentage = (count / sample_size) * 100) %>%
+          group_by(virus) %>%
+          filter(sum(percentage > 0) > 0) %>% 
+          arrange(group, virus)
+        ggplot(exposure_summary_andat_df, aes(x = group, y = virus, fill = percentage)) +
+          geom_tile() +
+          scale_fill_gradient(low = "white", high = "maroon") +
+          theme_minimal() +
+          labs(title = "Viral Exposure by Role Type",
+               x = "Role Type",
+               y = "Virus Species",
+               fill = "Percent Exposed") +
+          theme(axis.text.x = element_text(hjust = 1))
+
   
-  hist(demo_df$species_richness)
-  
-  ggplot(demo_df, aes(x = group, y = species_richness)) +
-    geom_boxplot() +
-    labs(x = "role", y = "richness") +
-    theme_minimal()
-  
-# Relevel Groups
-  demo_df <- demo_df %>%
-    mutate(group = factor(group, levels = c("Periphery", "Core", "MostPopular")))
-  
+# Initial model, try zero inflated model  
   demo_df <- demo_df %>%
     mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
   
@@ -606,8 +672,6 @@
     select(social_netid, village, age, gender, school_level, main_activity, group, species_richness)
   model_df = na.omit(model_df)
   
-  
-# Initial model, try zero inflated model  
   m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + village + group,
                data = model_df,
                family = "poisson",
