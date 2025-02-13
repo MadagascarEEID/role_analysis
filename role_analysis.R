@@ -9,7 +9,12 @@
 
 # Load Packages
   library(tidyverse)
+  library(gtsummary)
+  library(igraph)
+  library(ggraph)
+  library(patchwork)
   library(ideanet)
+  library(MuMIn)
 
 # set File Path
   if (paste(Sys.info()[[1]], collapse=" ") == "Windows"){
@@ -22,119 +27,158 @@
 #   FUNCTIONS   #
 #################
 
-# Prevalence Computer
-  prevalence <- function(data, parasite, group_type = NULL, group_name = NULL){
-  
-  # compute overall prevalence if group argument is missing
-  
-  if(is.null(group_type)) {
+# Triad and Centrality Summary Plots
+  plot_role_summaries <- function(clustering_variables, cluster_groups) {
     
-    result <- data %>%
-      group_by(!!sym(parasite)) %>%
-      summarize(count = n())
-  }
-  
-  # filter by subgroup if specified
-  
-  else{
-    result <- data %>%
-      filter(!!sym(group_type) == !!(group_name)) %>%
-      group_by(!!sym(parasite)) %>%
-      summarize(count = n())
-  }
-  
-  # print infection count and prevalence
-  
-  total_count <- sum(result$count)
-  
-  result <- result %>%
-    mutate(prevalence = count / total_count * 100)
-  
-  cat(parasite, group_type, group_name)
-  
-  print(result)
-}
+    # Prepare data for triad positions
+      triad_df <- clustering_variables %>%
+        select(id, cluster, any_of(c("freetime_021C_B", "freetime_021C_S", "freetime_021D_E", "freetime_021D_S", 
+                             "freetime_021U_E", "freetime_021U_S", "freetime_030T_S", "freetime_111D_S", 
+                             "freetime_021C_E", "freetime_111U_E", "freetime_030T_E", "freetime_111D_B", 
+                             "freetime_111D_E", "freetime_111U_S", "freetime_201_S", "freetime_111U_B", 
+                             "freetime_201_B", "freetime_120C_S", "freetime_120C_B", "freetime_120C_E", 
+                             "freetime_030C", "freetime_030T_B", "freetime_210_B", "freetime_300", 
+                             "freetime_210_S", "freetime_210_E", "freetime_120D_S", "freetime_120U_S", 
+                             "freetime_120D_E", "freetime_120U_E", "food_help_received_021C_B", 
+                             "food_help_received_021C_E", "food_help_received_021C_S", "food_help_received_021D_E", 
+                             "food_help_received_021D_S", "food_help_received_021U_E", "food_help_received_021U_S", 
+                             "food_help_received_111D_S", "food_help_received_111U_E", "food_help_received_111D_B", 
+                             "food_help_received_111D_E", "food_help_received_111U_S", "food_help_received_030T_S", 
+                             "food_help_received_120D_E", "food_help_received_201_B", "food_help_received_201_S", 
+                             "food_help_received_030T_B", "food_help_received_030T_E", "food_help_received_120U_E", 
+                             "food_help_received_111U_B", "food_help_received_120D_S", "food_help_received_120C_B", 
+                             "food_help_received_120U_S", "food_help_received_120C_S", "food_help_received_120C_E", 
+                             "food_help_received_300", "food_help_provided_021D_E", "food_help_provided_021U_E", 
+                             "food_help_provided_021U_S", "food_help_provided_021C_S", "food_help_provided_021D_S", 
+                             "food_help_provided_111D_S", "food_help_provided_021C_B", "food_help_provided_021C_E", 
+                             "food_help_provided_111D_B", "food_help_provided_111U_E", "food_help_provided_111D_E", 
+                             "food_help_provided_120D_S", "food_help_provided_111U_S", "food_help_provided_030T_S", 
+                             "food_help_provided_111U_B", "food_help_provided_210_S", "food_help_provided_210_E", 
+                             "food_help_provided_210_B", "food_help_provided_120U_S", "food_help_provided_120C_B", 
+                             "food_help_provided_030T_B", "food_help_provided_120D_E", "food_help_provided_201_S", 
+                             "food_help_provided_201_B", "food_help_provided_030T_E", "food_help_provided_030C", 
+                             "food_help_provided_120C_E", "food_help_provided_120C_S", "food_help_provided_120U_E", 
+                             "farm_help_received_021C_B", "farm_help_received_021C_E", "farm_help_received_021C_S", 
+                             "farm_help_received_021U_S", "farm_help_received_111D_B", "farm_help_received_111U_B", 
+                             "farm_help_received_111U_S", "farm_help_received_111D_E", "farm_help_received_120U_S", 
+                             "farm_help_received_021U_E", "farm_help_received_111D_S", "farm_help_received_021D_E", 
+                             "farm_help_received_021D_S", "farm_help_received_111U_E", "farm_help_received_030T_E", 
+                             "farm_help_received_030T_S", "farm_help_received_120C_B", "farm_help_received_120D_E", 
+                             "farm_help_received_201_S", "farm_help_received_210_S", "farm_help_received_120C_E", 
+                             "farm_help_received_201_B", "farm_help_received_210_B", "farm_help_received_210_E", 
+                             "farm_help_received_300", "farm_help_received_120C_S", "farm_help_received_120D_S", 
+                             "farm_help_received_120U_E", "farm_help_received_030T_B", "farm_help_provided_021D_E", 
+                             "farm_help_provided_021C_S", "farm_help_provided_021D_S", "farm_help_provided_021U_S", 
+                             "farm_help_provided_021C_B", "farm_help_provided_021C_E", "farm_help_provided_021U_E", 
+                             "farm_help_provided_111D_B", "farm_help_provided_111U_B", "farm_help_provided_111U_E", 
+                             "farm_help_provided_111U_S", "farm_help_provided_030T_S", "farm_help_provided_111D_S", 
+                             "farm_help_provided_120D_S", "farm_help_provided_030C", "farm_help_provided_030T_E", 
+                             "farm_help_provided_120U_E", "farm_help_provided_111D_E", "farm_help_provided_120C_S", 
+                             "farm_help_provided_120C_E", "farm_help_provided_120C_B", "farm_help_provided_120D_E", 
+                             "farm_help_provided_120U_S", "farm_help_provided_300", "farm_help_provided_210_B", 
+                             "farm_help_provided_030T_B", "farm_help_provided_201_B", "farm_help_provided_210_S")))
+        triad_summary_df <- triad_df %>% 
+          mutate(group = factor(case_when(
+            cluster %in% cluster_groups$most_popular ~ "Most Popular",
+            cluster %in% cluster_groups$core ~ "Core",
+            cluster %in% cluster_groups$periphery ~ "Periphery"
+          ), levels = c("Most Popular", "Core", "Periphery"))) %>% 
+          group_by(group) %>% 
+          summarise(across(matches("^(freetime|food_help_provided|food_help_received|farm_help_provided|farm_help_received)"), mean, na.rm = TRUE)) %>% 
+          ungroup() %>% 
+          mutate(across(where(is.numeric), ~ scale(.)[,1], .names = "std_{.col}")) %>% 
+          select(group, starts_with("std_")) %>% 
+          pivot_longer(cols = -group, names_to = "variable", values_to = "value") %>% 
+          mutate(relation = case_when(
+            str_detect(variable, "^std_freetime") ~ "Free Time",
+            str_detect(variable, "^std_food_help_provided") ~ "Food Help Provided",
+            str_detect(variable, "^std_food_help_received") ~ "Food Help Received",
+            str_detect(variable, "^std_farm_help_provided") ~ "Farm Help Provided",
+            str_detect(variable, "^std_farm_help_received") ~ "Farm Help Received"
+          ),
+          triad_position = str_remove(variable, "^(std_freetime_|std_food_help_provided_|std_food_help_received_|std_farm_help_provided_|std_farm_help_received_)")
+          )
 
-# Make Degree Centrality Summary Plots
-  degree_plot <- function(summary_df, cluster_list) {
-  
-  # make dataframe with mean degree
-  degree_df <- summary_df %>%
-    select(cluster, mean_in_degree_std, mean_out_degree_std,
-           mean_freetime_in_degree_std, mean_freetime_out_degree_std,
-           mean_farm_help_received_in_degree_std, mean_farm_help_received_out_degree_std,
-           mean_farm_help_provided_in_degree_std, mean_farm_help_provided_out_degree_std,
-           mean_food_help_received_in_degree_std, mean_food_help_received_out_degree_std,
-           mean_food_help_provided_in_degree_std, mean_food_help_provided_out_degree_std) %>%
-    pivot_longer(cols = -cluster, names_to = "centrality", values_to = "mean_std") %>%
-    mutate(centrality = str_remove(centrality, "_std")) %>%
-    mutate(centrality = str_remove(centrality, "mean_")) %>%
-    mutate(color = if_else(mean_std > 0, "positive", "negative"))
-  
-  # create list to store plots
-  degree_plot_list <- lapply(cluster_list, function(i) {
-    
-    # create cluster dataframe
-    cluster_df <- degree_df %>%
-      filter(cluster == i)
-    
-    # make plot
-    p <- ggplot(cluster_df, aes(x = centrality, y = mean_std, fill = color)) +
-      geom_col() +
-      scale_fill_manual(values = c("negative" = "maroon", "positive" = "navy")) +
-      xlab("Centrality Measure") +
-      ylab("Mean Score (Standardized)") +
-      coord_flip() +
-      theme_classic() +
-      theme(legend.position = "none",
-            axis.text = element_text(color = "black"))
-    
-    return(p)
-  })
-  
-  # name list elements
-  names(degree_plot_list) <- paste0("cluster_", seq_along(degree_plot_list))
-  
-  return(degree_plot_list)
-}
+        # Make Plot
+          triad_plot <- ggplot(triad_summary_df, aes(x = triad_position, y = value, fill = value > 0)) +
+            geom_col(position = "dodge") +
+            scale_fill_manual(values = c("TRUE" = "navy", "FALSE" = "maroon")) +
+            xlab("Triad Position") +
+            ylab("Mean Frequency (Standardized)") +
+            theme_classic() +
+            theme(legend.position = "none",
+                  axis.text.x = element_text(angle = 90, hjust = 1, color = "black", size = 14, face = "bold"),
+                  axis.text.y = element_text(size = 14, face = "bold"),
+                  axis.title.x = element_text(size = 16, face = "bold"),
+                  axis.title.y = element_text(size = 16, face = "bold"),
+                  strip.text = element_text(size = 14, face = "bold")) +
+            facet_grid(relation ~ group, scales = "free_y") +  # Separate plots for each category and facet by group
+            theme(panel.border = element_rect(fill = NA, color = "black"))
+          
+        # Prepare data for centrality measures
+          cent_df <- clustering_variables %>%
+            select(id, cluster, any_of(c("freetime_total_degree", "freetime_in_degree", "freetime_out_degree", 
+                                 "food_help_received_total_degree", "food_help_received_in_degree", "food_help_received_out_degree", 
+                                 "food_help_provided_total_degree", "food_help_provided_in_degree", "food_help_provided_out_degree", 
+                                 "farm_help_received_total_degree", "farm_help_received_in_degree", "farm_help_received_out_degree", 
+                                 "farm_help_provided_total_degree", "farm_help_provided_in_degree", "farm_help_provided_out_degree", 
+                                 "betweenness_scores", "freetime_betweenness_scores", "food_help_received_betweenness_scores", 
+                                 "food_help_provided_betweenness_scores", "farm_help_received_betweenness_scores", "farm_help_provided_betweenness_scores", 
+                                 "bonpow", "bonpow_negative", "freetime_bonpow", "freetime_bonpow_negative", 
+                                 "food_help_received_bonpow", "food_help_received_bonpow_negative", "food_help_provided_bonpow", "food_help_provided_bonpow_negative", 
+                                 "farm_help_received_bonpow", "farm_help_received_bonpow_negative", "farm_help_provided_bonpow", "farm_help_provided_bonpow_negative", 
+                                 "eigen_centrality", "freetime_eigen_centrality", "food_help_received_eigen_centrality", 
+                                 "food_help_provided_eigen_centrality", "farm_help_received_eigen_centrality", "farm_help_provided_eigen_centrality", 
+                                 "closeness_in", "closeness_out", "closeness_undirected", 
+                                 "freetime_closeness_in", "freetime_closeness_out", "freetime_closeness_undirected", 
+                                 "food_help_received_closeness_in", "food_help_received_closeness_out", "food_help_received_closeness_undirected", 
+                                 "food_help_provided_closeness_in", "food_help_provided_closeness_out", "food_help_provided_closeness_undirected", 
+                                 "farm_help_received_closeness_in", "farm_help_received_closeness_out", "farm_help_received_closeness_undirected", 
+                                 "farm_help_provided_closeness_in", "farm_help_provided_closeness_out", "farm_help_provided_closeness_undirected")))
 
-# Make Triad Summary Plots
-  triad_plot <- function(summary_df, cluster_list) {
-  
-  # make dataframe with mean degree
-  triad_df <- summary_df %>%
-    select(cluster, c(mean_summary_graph_021c_b_std:mean_summary_graph_300_std)) %>%
-    pivot_longer(cols = -cluster, names_to = "triad", values_to = "mean_std") %>%
-    mutate(triad = str_remove(triad, "mean_summary_graph_")) %>%
-    mutate(triad = str_remove(triad, "_std")) %>%
-    mutate(color = if_else(mean_std > 0, "positive", "negative"))
-  
-  # create list to store plots
-  triad_plot_list <- lapply(cluster_list, function(i) {
-    
-    # create cluster dataframe
-    cluster_df <- triad_df %>%
-      filter(cluster == i)
-    
-    # make plot
-    p <- ggplot(cluster_df, aes(x = triad, y = mean_std, fill = color)) +
-      geom_col() +
-      scale_fill_manual(values = c("negative" = "maroon", "positive" = "navy")) +
-      xlab("Triad Position") +
-      ylab("Mean Frequency (Standardized)") +
-      coord_flip() +
-      theme_classic() +
-      theme(legend.position = "none",
-            axis.text = element_text(color = "black"))
-    
-    return(p)
-  })
-  
-  # name list elements
-  names(triad_plot_list) <- paste0("cluster_", seq_along(triad_plot_list))
-  
-  return(triad_plot_list)
-}
+            cent_summary_df <- cent_df %>% 
+              mutate(group = factor(case_when(
+                cluster %in% cluster_groups$most_popular ~ "Most Popular",
+                cluster %in% cluster_groups$core ~ "Core",
+                cluster %in% cluster_groups$periphery ~ "Periphery"
+              ), levels = c("Most Popular", "Core", "Periphery"))) %>% 
+              group_by(group) %>% 
+              summarise(across(matches("^(freetime|food_help_provided|food_help_received|farm_help_provided|farm_help_received)_"), mean, na.rm = TRUE)) %>% 
+              ungroup() %>% 
+              mutate(across(where(is.numeric), ~ scale(.)[,1], .names = "std_{.col}")) %>% 
+              select(group, starts_with("std_")) %>% 
+              pivot_longer(cols = -group, names_to = "variable", values_to = "value") %>% 
+              mutate(relation = case_when(
+                str_detect(variable, "^std_freetime") ~ "Free Time",
+                str_detect(variable, "^std_food_help_provided") ~ "Food Help Provided",
+                str_detect(variable, "^std_food_help_received") ~ "Food Help Received",
+                str_detect(variable, "^std_farm_help_provided") ~ "Farm Help Provided",
+                str_detect(variable, "^std_farm_help_received") ~ "Farm Help Received"
+              ),
+              centrality_measure = str_remove(variable, "^(std_freetime_|std_food_help_provided_|std_food_help_received_|std_farm_help_provided_|std_farm_help_received_)") %>%
+                str_replace_all("_", " ") %>% 
+                str_replace("betweenness scores", "Betweenness") %>%
+                str_to_title()
+              )
+
+            # Make Plot
+              cent_plot <- ggplot(cent_summary_df, aes(x = centrality_measure, y = value, fill = value > 0)) +
+                geom_col(position = "dodge") +
+                scale_fill_manual(values = c("TRUE" = "navy", "FALSE" = "maroon")) +
+                xlab("Centrality Measure") +
+                ylab("Mean Centrality Score (Standardized)") +
+                theme_classic() +
+                theme(legend.position = "none",
+                      axis.text.x = element_text(angle = 40, hjust = 1, color = "black", size = 14, face = "bold"),
+                      axis.text.y = element_text(size = 14, face = "bold"),
+                      axis.title.x = element_text(size = 16, face = "bold"),
+                      axis.title.y = element_text(size = 16, face = "bold"),
+                      strip.text = element_text(size = 14, face = "bold")) +
+                facet_grid(relation ~ group, scales = "free_y") +  # Groups on top, relations on the right
+                theme(panel.border = element_rect(fill = NA, color = "black"))
+
+            return(list(triad_plot = triad_plot, centrality_plot = cent_plot))
+  }
 
 # Extract Summary Edgelist from Role Analysis Results
   summary_el_extracter <- function(village_name) {
@@ -172,13 +216,20 @@
   demo_df <- demo_df %>%
     select(social_netid, village, gender, age, school_level, main_activity)
 
+# Recode Ampandrana as Andatsakala
+  demo_df <- demo_df %>%
+    mutate(village = case_when(
+      village == "Ampandrana" ~ "Andatsakala",
+      TRUE ~ village
+    ))
+
 # Separate Node Lists for Each Village
   nl_mandena <- demo_df %>%
     filter(village == "Mandena")
   nl_sarahandrano <- demo_df %>%
     filter(village == "Sarahandrano")
   nl_andatsakala <- demo_df %>%
-    filter(village == "Andatsakala" | village == "Ampandrana")
+    filter(village == "Andatsakala")
 
 #######################################
 #   CREATE MULTIRELATIONAL EDGELIST   #
@@ -206,6 +257,123 @@
     filter(grepl("D.SNH", ego_id))
   el_andatsakala <- edgelist %>%
     filter(grepl("E.SNH", ego_id))
+  
+##############################################
+#   CHARACTERIZE NETWORKS AND PARTICIPANTS   #
+##############################################
+
+# Recode Occupation as Farmer vs. Non-Farmer
+  demo_df <- demo_df %>%
+    mutate(main_activity = case_when(
+      str_detect(main_activity, "farm") ~ "farmer",
+      is.na(main_activity) ~ NA_character_,
+      TRUE ~ "non-farmer"))
+  
+# Make Table 1 
+  tbl1 <- demo_df %>%
+    tbl_summary(include = c(age, gender, school_level, main_activity),
+                by = village,
+                missing = "ifany")
+  tbl2 <- demo_df %>%
+    tbl_summary(include = c(age, gender, school_level, main_activity),
+                missing = "ifany")
+  # merge tables
+    tbl_merge(tbls = list(tbl1, tbl2),
+            tab_spanner = c("**Village**", "**All Villages**"))
+    
+# Create a Weighted Edgelist for Visualizing the Networks
+  el_weighted_mandena <- el_mandena %>%
+    group_by(ego_id, alter_id) %>%
+    summarise(weight = n_distinct(relation), .groups = "drop")
+  el_weighted_sarahandrano <- el_sarahandrano %>%
+    group_by(ego_id, alter_id) %>%
+    summarise(weight = n_distinct(relation), .groups = "drop")
+  el_weighted_andatsakala <- el_andatsakala %>%
+    group_by(ego_id, alter_id) %>%
+    summarise(weight = n_distinct(relation), .groups = "drop")
+  
+# Construct Networks
+  mandena_net <- graph_from_data_frame(el_weighted_mandena, nl_mandena, directed = TRUE)
+  sarahandrano_net <- graph_from_data_frame(el_weighted_sarahandrano, nl_sarahandrano, directed = TRUE)
+  andatsakala_net <- graph_from_data_frame(el_weighted_andatsakala, nl_andatsakala, directed = TRUE)
+  
+# Plot Networks
+  # Define edge thickness scale
+    edge_thickness_range <- c(0.5, 2)
+    
+  # Compute in-degree centrality
+    V(mandena_net)$indegree <- degree(mandena_net, mode = "in")
+    V(sarahandrano_net)$indegree <- degree(sarahandrano_net, mode = "in")
+    V(andatsakala_net)$indegree <- degree(andatsakala_net, mode = "in")
+    
+  # Define the five distinct edge weight levels
+    unique_weights <- sort(unique(E(mandena_net)$weight))
+  
+  # Plot with node size based on in-degree centrality
+    # Create individual plots
+    plot_mandena <- ggraph(mandena_net, layout = "stress") +  
+      geom_edge_link(aes(color = weight), 
+                     alpha = 1,  
+                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+      geom_node_point(aes(size = indegree), color = "darkred") +  
+      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
+      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                 values = scales::rescale(unique_weights), 
+                                 name = "Edge Weight") +  
+      guides(size = guide_legend(order = 1), 
+             color = guide_colorbar(order = 2)) +
+      theme_void() + 
+      ggtitle("Village A") +  
+      theme(text = element_text(size = 30),  
+            plot.title = element_text(size = 30, face = "bold"),
+            legend.text = element_text(size = 25),
+            legend.title = element_text(size = 25, vjust = 3),
+            legend.spacing = unit(2, "cm"))
+    
+    plot_sarahandrano <- ggraph(sarahandrano_net, layout = "stress") +  
+      geom_edge_link(aes(color = weight), 
+                     alpha = 1,  
+                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+      geom_node_point(aes(size = indegree), color = "darkred") +  
+      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
+      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                 values = scales::rescale(unique_weights), 
+                                 name = "Edge Weight") +  
+      guides(size = guide_legend(order = 1), 
+             color = guide_colorbar(order = 2)) +
+      theme_void() + 
+      ggtitle("Village B") +  
+      theme(text = element_text(size = 30),
+            plot.title = element_text(size = 30, face = "bold"),
+            legend.text = element_text(size = 25),
+            legend.title = element_text(size = 25, vjust = 3),
+            legend.spacing = unit(2, "cm"))
+    
+    plot_andatsakala <- ggraph(andatsakala_net, layout = "stress") +  
+      geom_edge_link(aes(color = weight), 
+                     alpha = 1,  
+                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+      geom_node_point(aes(size = indegree), color = "darkred") +  
+      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
+      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                 values = scales::rescale(unique_weights), 
+                                 name = "Edge Weight") +
+      guides(size = guide_legend(order = 1), 
+             color = guide_colorbar(order = 2)) +
+      theme_void() + 
+      ggtitle("Village C") +  
+      theme(text = element_text(size = 30),
+            plot.title = element_text(size = 30, face = "bold"),
+            legend.text = element_text(size = 25),
+            legend.title = element_text(size = 25, vjust = 3),
+            legend.spacing = unit(2, "cm"))
+    
+    # Combine the plots in a single column (3 rows)
+    final_plot <- plot_mandena / plot_sarahandrano / plot_andatsakala
+    
+    # Display the combined plot
+    print(final_plot)
+  
 
 #######################################
 #   REFORMAT DATA FOR ROLE ANALYSIS   #
@@ -250,10 +418,6 @@
 #   ROLE ANALYSIS  #
 ####################
 
-# Set Clustering Parameters
-min = 6 # Minimum Number of Partitions
-max = 20 # Maximum Number of Partitions
-
 # Initialize List to Store Output for Each Village
   role_analysis_list <- vector("list", length(netwrite_list))
   names(role_analysis_list) <- names(netwrite_list)
@@ -261,19 +425,20 @@ max = 20 # Maximum Number of Partitions
 # Iterate Role Analysis Function Over Netwrite Object for Each Village
     for (i in seq_along(netwrite_list)) {
       village <- netwrite_list[[i]]
-    
+
     # Execute Role Analysis Function
       output <- role_analysis(graph = village$igraph_list,
                               nodes = village$node_measures,
                               directed = TRUE,
                               method = "cluster",
+                              fast_triad = TRUE,
                               min_partitions = 6,
                               max_partitions = 20,
                               min_partition_size = 5,
                               viz = TRUE,
                               retain_variables = TRUE,
                               cluster_summaries = TRUE)
-    
+
     # Add Role Analysis Output to the list
       role_analysis_list[[i]] <- list(
         cluster_assignments = output$cluster_assignments,
@@ -289,548 +454,294 @@ max = 20 # Maximum Number of Partitions
         clustering_variables = output$clustering_variables
     )
     }
-  
+
 # Save Output
 # saveRDS(role_analysis_list, "role_output.rds")
+ role_analysis_list <- read_rds("C:/Users/tmbar/OneDrive/Documents/GitHub/role_analysis/role_output.rds")
+
+# Plot Triad and Centrality Summaries
+ 
+ # Assign Cluster Groups
+   cluster_groups_man <- list(
+     most_popular = c(7),
+     core = c(1, 2, 5, 6, 8),
+     periphery = c(3, 4)
+   )
+   cluster_groups_sara <- list(
+     most_popular = c(2),
+     core = c(1, 4),
+     periphery = c(3, 5)
+   )
+   cluster_groups_andat <- list(
+     most_popular = c(2),
+     core = c(3),
+     periphery = c(1,4)
+   )
+   
+    man_summary_plots <- plot_role_summaries(role_analysis_list$mandena$clustering_variables, cluster_groups_man)
+    sara_summary_plots <- plot_role_summaries(role_analysis_list$sarahandrano$clustering_variables, cluster_groups_sara)
+    andat_summary_plots <- plot_role_summaries(role_analysis_list$andatsakala$clustering_variables, cluster_groups_andat)
+    
+# Examine Differences in Demographics by Role
   
-# loop over each village and extract summary edgelist
-villages <- c("mandena", "sarahandrano", "andatsakala")
-summary_el <- list()
-for (i in seq_along(villages)) {
+  # Exctract Cluster Assignments and Join with Demographic Data
+    net_data$mandena$nl <- net_data$mandena$nl %>%
+      mutate(cluster_assignment = role_analysis_list$mandena$cluster_assignments$best_fit)
+    net_data$sarahandrano$nl <- net_data$sarahandrano$nl %>%
+      mutate(cluster_assignment = role_analysis_list$sarahandrano$cluster_assignments$best_fit)
+    net_data$andatsakala$nl <- net_data$andatsakala$nl %>%
+      mutate(cluster_assignment = role_analysis_list$andatsakala$cluster_assignments$best_fit)
+    cluster_assignments <- net_data$mandena$nl %>%
+      bind_rows(net_data$sarahandrano$nl, net_data$andatsakala$nl) %>%
+      select(social_netid, cluster_assignment)
+    demo_df <- demo_df %>%
+      left_join(cluster_assignments)
   
-  # extract summary edgelist
-  results <- summary_el_extracter(i)
+  # Make Table 2
+    demo_df <- demo_df %>%
+      mutate(group = case_when(
+        village == "Mandena" & cluster_assignment == 7 ~ "MostPopular",
+        village == "Mandena" & cluster_assignment == 1 ~ "Core",
+        village == "Mandena" & cluster_assignment == 2 ~ "Core",
+        village == "Mandena" & cluster_assignment == 5 ~ "Core",
+        village == "Mandena" & cluster_assignment == 6 ~ "Core",
+        village == "Mandena" & cluster_assignment == 8 ~ "Core",
+        village == "Mandena" & cluster_assignment == 3 ~ "Periphery",
+        village == "Mandena" & cluster_assignment == 4 ~ "Periphery",
+        village == "Sarahandrano" & cluster_assignment == 2 ~ "MostPopular",
+        village == "Sarahandrano" & cluster_assignment == 1 ~ "Core",
+        village == "Sarahandrano" & cluster_assignment == 4 ~ "Core",
+        village == "Sarahandrano" & cluster_assignment == 3 ~ "Periphery",
+        village == "Sarahandrano" & cluster_assignment == 5 ~ "Periphery",
+        village == "Andatsakala" & cluster_assignment == 2 ~ "MostPopular",
+        village == "Andatsakala" & cluster_assignment == 3 ~ "Core",
+        village == "Andatsakala" & cluster_assignment == 1 ~ "Periphery",
+        village == "Andatsakala" & cluster_assignment == 4 ~ "Periphery"
+      ))
+      
+    demo_df %>%
+      tbl_summary(
+        include = c(age, gender, school_level, main_activity),
+        by = group,  # Group by the new combined variable
+        missing = "ifany"
+      )
+
+##################################################
+#   ASSOCIATION BETWEEN ROLES AND Virus Exposure #
+##################################################
+
+# Load Virscan Data
+  virscan1 <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Virscan/C5/C5_All_HitsList.csv")
+  virscan2 <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Virscan/C10/C10_All_HitsList.csv")
+  virscan <- bind_rows(virscan1,virscan2)
   
-  # add output to list
-  summary_el[[villages[i]]] <- list(
-    cluster_n = results$cluster_n,
-    el = results$el
-    )
-}
+# Simplify Data and Compute Virus Family Richness
+  virscan <- virscan %>%
+    mutate(social_netid = str_remove(sample_name, " FTA| W903")) %>%
+    mutate(social_netid = sub("A-SNH", "A.SNH", social_netid)) %>%
+    mutate(social_netid = sub("D-SNH", "D.SNH", social_netid)) %>%
+    mutate(social_netid = sub("E-SNH", "E.SNH", social_netid)) %>%
+    filter(grepl("SNH", social_netid)) %>%
+    select(social_netid, uniprot_family, uniprot_specie, virus_pos) %>%
+    group_by(social_netid, uniprot_specie) %>%
+    mutate(virus_pos = if_else(any(virus_pos == TRUE), 1, 0)) %>%
+    ungroup() %>%
+    select(social_netid, uniprot_specie, virus_pos) %>%
+    distinct() %>%
+    pivot_wider(names_from = uniprot_specie,
+                values_from = virus_pos,
+                values_fill = list(virus_pos = 0)) %>%
+    mutate(species_richness = rowSums(select(., -social_netid), na.rm = TRUE))
 
-# write out summary edgelists to plot by hand
-write_csv(summary_el$mandena$el, "man_el.csv")
-write_csv(summary_el$sarahandrano$el, "sara_el.csv")
-write_csv(summary_el$andatsakala$el, "andat_el.csv")
-
-# plot triad summaries
-man_triad_plots <- triad_plot(role_analysis_list$mandena$cluster_summaries,
-                              c(1, 2, 3, 4, 5, 6))
-sara_triad_plots <- triad_plot(role_analysis_list$sarahandrano$cluster_summaries,
-                              c(1, 2, 3, 4))
-andat_triad_plots <- triad_plot(role_analysis_list$andatsakala$cluster_summaries,
-                               c(1, 2, 3, 4))
-
-# plot degree centrality summaries
-man_degree_plots <- degree_plot(role_analysis_list$mandena$cluster_summaries,
-                              c(1, 2, 3, 4, 5, 6))
-sara_degree_plots <- degree_plot(role_analysis_list$sarahandrano$cluster_summaries,
-                               c(1, 2, 3, 4))
-andat_degree_plots <- degree_plot(role_analysis_list$andatsakala$cluster_summaries,
-                                c(1, 2, 3, 4))
-
-# arrange plots into grids for presentation
-man_summary_plot_1 <- gridExtra::grid.arrange(grobs = list(man_triad_plots$cluster_1, man_triad_plots$cluster_2, man_triad_plots$cluster_3,
-                                                        man_degree_plots$cluster_1, man_degree_plots$cluster_2, man_degree_plots$cluster_3),
-                                              ncol = 3, nrow = 2)
-man_summary_plot_2 <- gridExtra::grid.arrange(grobs = list(man_triad_plots$cluster_4, man_triad_plots$cluster_5, man_triad_plots$cluster_6,
-                                                           man_degree_plots$cluster_4, man_degree_plots$cluster_5, man_degree_plots$cluster_6),
-                                              ncol = 3, nrow = 2)
-sara_summary_plot <- gridExtra::grid.arrange(grobs = list(sara_triad_plots$cluster_1, sara_triad_plots$cluster_2, sara_triad_plots$cluster_3,
-                                                           sara_degree_plots$cluster_1, sara_degree_plots$cluster_2, sara_degree_plots$cluster_3),
-                                              ncol = 3, nrow = 2)
-andat_summary_plot <- gridExtra::grid.arrange(grobs = list(andat_triad_plots$cluster_1, andat_triad_plots$cluster_2, andat_triad_plots$cluster_3,
-                                                            andat_degree_plots$cluster_1, andat_degree_plots$cluster_2, andat_degree_plots$cluster_3),
-                                               ncol = 3, nrow = 2)
-
-# save plots
-ggsave("man_summary_plot_1.pdf", man_summary_plot_1, width = 20, height = 10)
-ggsave("man_summary_plot_2.pdf", man_summary_plot_2, width = 20, height = 10)
-ggsave("sara_summary_plot.pdf", sara_summary_plot, width = 20, height = 10)
-ggsave("andat_summary_plot.pdf", andat_summary_plot, width = 20, height = 10)
-
-#######################################
-## Do roles predict hookworm infection?
-#######################################
-
-# read in hookworm data
-hookworm_df <- read_csv("/Users/tylerbarrett/Library/CloudStorage/Box-Box/EEID_Data_public/clean_data_tables/HUMAN_PARASITE_ALL_VILLAGE.csv")
-
-# select relevant data and prep data
-hookworm_df <- hookworm_df %>%
-  select(social_netid, NC_reads, Necator_americanus, Ancylostoma_ceylanicum) %>%
-  filter(NC_reads >= 500) %>% # filter based on 500 read cutoff
-  mutate(social_netid = sub("ASNH_", "A.SNH", social_netid)) %>% # change "_" to "."
-  mutate(social_netid = sub("DSNH_", "D.SNH", social_netid)) %>%
-  mutate(social_netid = sub("ESNH_", "E.SNH", social_netid))
-
-# merge with demographic data
-hookworm_df <- hookworm_df %>%
-  left_join(demo_df, by = "social_netid")
-
-# combine Andatsakala and Ampandrana
-hookworm_df <- hookworm_df %>%
-  mutate(village = if_else(village == "Ampandrana", "Andatsakala", village))
-
-# create infection indicator
-hookworm_df <- hookworm_df %>%
-  mutate(human_hookworm = if_else(Necator_americanus > 0, 1, 0)) %>%
-  mutate(dog_hookworm = if_else(Ancylostoma_ceylanicum > 0, 1, 0))
-
-# extract cluster assignments
-net_data$mandena$nl <- net_data$mandena$nl %>%
-  mutate(cluster_assignment = role_analysis_list$mandena$cluster_assignments$best_fit)
-net_data$sarahandrano$nl <- net_data$sarahandrano$nl %>%
-  mutate(cluster_assignment = role_analysis_list$sarahandrano$cluster_assignments$best_fit)
-net_data$andatsakala$nl <- net_data$andatsakala$nl %>%
-  mutate(cluster_assignment = role_analysis_list$andatsakala$cluster_assignments$best_fit)
-
-# join into one dataframe
-cluster_assignments <- net_data$mandena$nl %>%
-  bind_rows(net_data$sarahandrano$nl, net_data$andatsakala$nl) %>%
-  select(social_netid, cluster_assignment)
-
-# add cluster assignments to hookworm dataframe
-hookworm_df <- hookworm_df %>%
-  left_join(cluster_assignments, by = "social_netid")
-
-animal_df <- read_csv("/Users/tylerbarrett/Library/CloudStorage/Box-Box/EEID_Data_public/clean_data_tables/Survey_Animal_Interaction.csv")
-
-animal_df <- animal_df %>%
-  select(social_netid, pet_dogs)
-
-hookworm_df <- hookworm_df %>%
-  left_join(animal_df)
-
-# filter to complete cases for modeling
-hookworm_df <- hookworm_df %>%
-  filter(!is.na(age) & !is.na(gender) & !is.na(school_level), !is.na(pet_dogs))
-
-# standardize numeric variables
-hookworm_df <- hookworm_df %>%
-  mutate(age = scale(age))
-
-# relevel education for models
-hookworm_df <- hookworm_df %>%
-  mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher"))) %>%
-  mutate(school_level = recode(school_level, "None" = "< Secondary", "Primary" = "< Secondary",
-                               "Secondary" = "≥ Secondary", "Higher" = "≥ Secondary"))
-
-# split into separate dataframes for each village
-hookworm_df_man <- hookworm_df %>%
-  filter(village == "Mandena")
-hookworm_df_sara <- hookworm_df %>%
-  filter(village == "Sarahandrano")
-hookworm_df_andat <- hookworm_df %>%
-  filter(village == "Andatsakala")
-
-# filter out isolated clusters for sarahandrano and andatsakala
-hookworm_df_sara <- hookworm_df_sara %>%
-  filter(cluster_assignment != 4)
-hookworm_df_andat <- hookworm_df_andat %>%
-  filter(cluster_assignment != 4)
-
-###########
-## Modeling
-###########
-
-# change cluster assignment to factor
-hookworm_df_man <- hookworm_df_man %>%
-  mutate(cluster_assignment = as.factor(cluster_assignment))
-hookworm_df_sara <- hookworm_df_sara %>%
-  mutate(cluster_assignment = as.factor(cluster_assignment))
-hookworm_df_andat <- hookworm_df_andat %>%
-  mutate(cluster_assignment = as.factor(cluster_assignment))
-
-man_human <- glm(human_hookworm ~
-                    age +
-                    gender +
-                    school_level +
-                    cluster_assignment,
-                  data = hookworm_df_man,
-                  family = "binomial",
-                  na.action = na.fail)
-summary(man_human)
-
-m1_plot <- jtools::effect_plot(man_human, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "maroon")
-
-m1_plot <- m1_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-man_dog <- glm(dog_hookworm ~
-                    age +
-                    gender +
-                    school_level +
-                    pet_dogs +
-                    cluster_assignment,
-                  data = hookworm_df_man,
-                  family = "binomial",
-                  na.action = na.fail)
-summary(man_dog)
-
-m2_plot <- jtools::effect_plot(man_dog, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "maroon")
-
-m2_plot <- m2_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-sara_human <- glm(human_hookworm ~
-                   age +
-                   gender +
-                   school_level +
-                   cluster_assignment,
-                 data = hookworm_df_sara,
-                 family = "binomial",
-                 na.action = na.fail)
-summary(sara_human)
-
-m3_plot <- jtools::effect_plot(sara_human, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "darkorange")
-
-m3_plot <- m3_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-sara_dog <- glm(dog_hookworm ~
-                 age +
-                 gender +
-                 school_level +
-                 pet_dogs +
-                 cluster_assignment,
-               data = hookworm_df_sara,
-               family = "binomial",
+# Join with Demographic Data
+  demo_df <- demo_df %>%
+    left_join(virscan, by = join_by(social_netid)) %>%
+    filter(!is.na(species_richness))
+  
+# characterize viral Exposure by Role Type...
+  exposure_summary_table <- demo_df %>%
+    select(group, social_netid, c(9:343)) %>% 
+    pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
+    complete(group, virus, fill = list(positive = 0)) %>%
+    group_by(group, virus) %>%
+    summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
+    left_join(
+      demo_df %>%
+        select(group, social_netid) %>%
+        distinct() %>%
+        group_by(group) %>%
+        summarise(sample_size = n_distinct(social_netid)), 
+      by = "group"
+    ) %>%
+    mutate(percentage = (count / sample_size) * 100) %>%
+    group_by(virus) %>%
+    filter(sum(percentage > 0) > 0) %>% 
+    arrange(group, virus)
+  
+  ggplot(exposure_summary_table, aes(x = group, y = virus, fill = percentage)) +
+    geom_tile() +
+    scale_fill_gradient(low = "white", high = "blue") +
+    theme_minimal() +
+    labs(title = "Viral Exposure by Role Type",
+         x = "Role Type",
+         y = "Virus Species",
+         fill = "Percent Exposed") +
+    theme(axis.text.x = element_text(hjust = 1))
+  
+  hist(demo_df$species_richness)
+  
+  ggplot(demo_df, aes(x = group, y = species_richness)) +
+    geom_boxplot() +
+    labs(x = "role", y = "richness") +
+    theme_minimal()
+  
+# Relevel Groups
+  demo_df <- demo_df %>%
+    mutate(group = factor(group, levels = c("Periphery", "Core", "MostPopular")))
+  
+  demo_df <- demo_df %>%
+    mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
+  
+  model_df <- demo_df %>%
+    select(social_netid, village, age, gender, school_level, main_activity, group, species_richness)
+  model_df = na.omit(model_df)
+  
+  
+# Initial model, try zero inflated model  
+  m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + village + group,
+               data = model_df,
+               family = "poisson",
+               
                na.action = na.fail)
-summary(sara_dog)
+  summary(m_viruses)
+  performance::check_model(m_viruses)
+  
+  # Use Dredge for Model Comparison
+  m_viruses_dredge <- dredge(m_viruses)
+  
+  # Average Models With Delta AICc < 2
+  m_viruses_avg <- model.avg(m_viruses_dredge, subset = delta < 2)
+  summary(m_viruses_avg)
+  plot(m_viruses_avg, intercept = FALSE)
 
-m4_plot <- jtools::effect_plot(sara_dog, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "darkorange")
-
-m4_plot <- m4_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-andat_human <- glm(human_hookworm ~
-                    age +
-                    gender +
-                    school_level +
-                    cluster_assignment,
-                  data = hookworm_df_andat,
-                  family = "binomial",
-                  na.action = na.fail)
-summary(andat_human)
-
-m5_plot <- jtools::effect_plot(andat_human, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "navy")
-
-m5_plot <- m5_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-andat_dog <- glm(dog_hookworm ~
-                  age +
-                  gender +
-                  school_level +
-                  pet_dogs +
-                  cluster_assignment,
-                data = hookworm_df_andat,
-                family = "binomial",
-                na.action = na.fail)
-summary(andat_dog)
-
-m6_plot <- jtools::effect_plot(andat_dog, cluster_assignment,
-                               x.label = "Cluster", y.label = "Predicted Probability of Infection",
-                               colors = "navy")
-
-m6_plot <- m6_plot +
-  scale_y_continuous(limits = c(0,1)) +
-  theme(axis.text = element_text(size = 20),
-        axis.title = element_text(size = 20))
-
-# combine model plots
-model_plots <- gridExtra::grid.arrange(grobs = list(m1_plot, m3_plot, m5_plot,
-                                                    m2_plot, m4_plot, m6_plot),
-                                              ncol = 3, nrow = 2)
-ggsave("model_plots.pdf", model_plots, width = 15, height = 11)
-
-
-## EXTRA CODE ##
+#######################
+#   HOOKWORM ANALYSIS #
+####################### 
+  
+# # Prepare Data for Analysis and Join with Demographic Data
+#   hookworm_df <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/HUMAN_PARASITE_ALL_VILLAGE.csv")
+#   hookworm_df <- hookworm_df %>%
+#     select(social_netid, NC_reads, Necator_americanus, Ancylostoma_ceylanicum) %>%
+#     filter(NC_reads >= 500) %>% # filter based on 500 read cutoff
+#     mutate(social_netid = sub("A.SNH.", "A.SNH", social_netid)) %>%
+#     mutate(social_netid = sub("D.SNH.", "D.SNH", social_netid)) %>%
+#     mutate(social_netid = sub("E.SNH.", "E.SNH", social_netid)) %>%
+#     mutate(human_hookworm = if_else(Necator_americanus > 0, 1, 0)) %>%
+#     mutate(dog_hookworm = if_else(Ancylostoma_ceylanicum > 0, 1, 0)) %>%
+#     select(social_netid, human_hookworm, dog_hookworm)
+#   demo_df <- demo_df %>%
+#     left_join(hookworm_df, by = "social_netid")
 # 
-# # compute prevalence
-# # overall
-# hum_hook_prev <- prevalence(hookworm_df_sara, "human_hookworm")
-# dog_hook_prev <- prevalence(hookworm_df_sara, "dog_hookworm")
+# # Load Animal Interaction Data to Get Dog Ownership & Join with Demographic Data
+#   animal_df <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Survey_Animal_Interaction.csv")
+#   animal_df <- animal_df %>%
+#     select(social_netid, pet_dogs)
+#   demo_df <- demo_df %>%
+#     left_join(animal_df)
 # 
-# p4 <- ggplot(hum_hook_prev, aes(x = as.factor(human_hookworm), y = prevalence,
-#                           fill = as.factor(human_hookworm),
-#                           label = prevalence)) +
-#   geom_col() +
-#   geom_text(aes(label = scales::label_number(suffix = "%", accuracy = 1)(prevalence)),
-#             hjust = -0.5, size = 5) +
-#   scale_x_discrete(labels = c("Not Infected", "Infected")) +
-#   scale_fill_manual(values = c('1' = "maroon", '0' = "lightblue")) +
-#   scale_y_continuous(limits = c(0, 100)) +
-#   xlab("Infection Status") +
-#   ylab("Percent") +
-#   labs(title = "Human Hookworm") +
-#   coord_flip() +
-#   theme_bw() +
-#   theme(legend.position = "none") +
-#   theme(axis.text.y = element_text(size = 24, color = "black")) +
-#   theme(axis.text.x = element_text(size = 24, color = "black")) +
-#   theme(axis.title.y = element_text(size = 0)) +
-#   theme(axis.title.x = element_text(size = 24)) +
-#   theme(plot.title = element_text(hjust = 0.5, size = 24))
+# # Relevel Education Variable
+#   demo_df <- demo_df %>%
+#     mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher"))) %>%
+#     mutate(school_level = recode(school_level, "None" = "< Secondary", "Primary" = "< Secondary",
+#                                  "Secondary" = "≥ Secondary", "Higher" = "≥ Secondary"))
 # 
-# ggsave("hum_hook_prev.png", p4)
+# # Relevel Groups
+#   demo_df <- demo_df %>%
+#     mutate(group = factor(group, levels = c("Periphery", "Core", "MostPopular")))
+#   
+#   demo_df <- demo_df %>%
+#     mutate(village = factor(village, levels = c("Mandena", "Sarahandrano", "Andatsakala")))
+#   
+#   demo_df <- demo_df %>%
+#     mutate(material_floor = factor(material_floor, level = c("dirt", "rafia", "ravenala",
+#                                                              "bamboo", "wood_planks", "cement"))) %>%
+#     mutate(material_floor = recode(material_floor, "rafia" = "ravenala"))
+#  
+# # Compute Prevalence by Role Group
+#   prevalence_data <- demo_df %>%
+#     group_by(group) %>%
+#     summarise(
+#       human_hookworm_prevalence = mean(human_hookworm, na.rm = TRUE),
+#       dog_hookworm_prevalence = mean(dog_hookworm, na.rm = TRUE),
+#       coinfection_prevalence = mean(human_hookworm & dog_hookworm, na.rm = TRUE)
+#     )
+#   prevalence_data_long <- prevalence_data %>%
+#     pivot_longer(cols = -group, names_to = "infection_type", values_to = "prevalence")
+#   ggplot(prevalence_data_long, aes(x = group, y = prevalence, fill = infection_type)) +
+#     geom_bar(stat = "identity", position = "dodge") +
+#     labs(
+#       title = "Prevalence of Hookworm Infections by Group",
+#       x = "Group",
+#       y = "Prevalence",
+#       fill = "Infection Type"
+#     ) +
+#     theme_minimal() +
+#     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#   
+# # Model the Relationship Between Roles and Hookworm Infection
 # 
-# p5 <- ggplot(dog_hook_prev, aes(x = as.factor(dog_hookworm), y = prevalence,
-#                           fill = as.factor(dog_hookworm),
-#                           label = prevalence)) +
-#   geom_col() +
-#   geom_text(aes(label = scales::label_number(suffix = "%", accuracy = 1)(prevalence)),
-#             hjust = -0.5, size = 5) +
-#   scale_x_discrete(labels = c("Not Infected", "Infected")) +
-#   scale_fill_manual(values = c('1' = "maroon", '0' = "lightblue")) +
-#   scale_y_continuous(limits = c(0, 100)) +
-#   xlab("Infection Status") +
-#   ylab("Percent") +
-#   labs(title = "Canine Hookworm") +
-#   coord_flip() +
-#   theme_bw() +
-#   theme(legend.position = "none") +
-#   theme(axis.text.y = element_text(size = 24, color = "black")) +
-#   theme(axis.text.x = element_text(size = 24, color = "black")) +
-#   theme(axis.title.y = element_text(size = 0)) +
-#   theme(axis.title.x = element_text(size = 24)) +
-#   theme(plot.title = element_text(hjust = 0.5, size = 24))
-# 
-# ggsave("dog_hook_prev.png", p5)
-# 
-# # by village
-# # create vector of villages
-# villages <- c(unique(hookworm_df$village))
-# # iterate prevalence function over villages and subtypes
-# for (i in villages) {
-#   result <- prevalence(hookworm_df, "human_hookworm", "village", i)
-# }
-# for (i in villages) {
-#   result <- prevalence(hookworm_df, "dog_hookworm", "village", i)
-# }
-# 
-# # extract cluster assignments
-# net_data$mandena$nl <- net_data$mandena$nl %>%
-#   mutate(cluster_assignment = role_analysis_list$mandena$cluster_assignments$best_fit)
-# net_data$sarahandrano$nl <- net_data$sarahandrano$nl %>%
-#   mutate(cluster_assignment = role_analysis_list$sarahandrano$cluster_assignments$best_fit)
-# net_data$andatsakala$nl <- net_data$andatsakala$nl %>%
-#   mutate(cluster_assignment = role_analysis_list$andatsakala$cluster_assignments$best_fit)
-# 
-# # join into one dataframe
-# cluster_assignments <- net_data$mandena$nl %>%
-#   bind_rows(net_data$sarahandrano$nl, net_data$andatsakala$nl) %>%
-#   select(social_netid, cluster_assignment)
-# 
-# # add cluster assignments to hookworm dataframe
-# hookworm_df <- hookworm_df %>%
-#   left_join(cluster_assignments, by = "social_netid")
-# 
-# animal_df <- read_csv("/Users/tylerbarrett/Library/CloudStorage/Box-Box/EEID_Data_public/clean_data_tables/Survey_Animal_Interaction.csv")
-# 
-# animal_df <- animal_df %>%
-#   select(social_netid, pet_dogs)
-# 
-# hookworm_df <- hookworm_df %>%
-#   left_join(animal_df)
-# 
-# # filter to complete cases for modeling
-# hookworm_df <- hookworm_df %>%
-#   filter(!is.na(age) & !is.na(gender) & !is.na(school_level), !is.na(pet_dogs))
-# 
-# # standardize numeric variables
-# hookworm_df <- hookworm_df %>%
-#   mutate(age = scale(age))
-# 
-# # relevel education for models
-# hookworm_df <- hookworm_df %>%
-#   mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher"))) %>%
-#   mutate(school_level = recode(school_level, "None" = "< Secondary", "Primary" = "< Secondary",
-#                                "Secondary" = "≥ Secondary", "Higher" = "≥ Secondary"))
-# 
-# # split into separate dataframes for each village
-# hookworm_df_man <- hookworm_df %>%
-#   filter(village == "Mandena")
-# hookworm_df_sara <- hookworm_df %>%
-#   filter(village == "Sarahandrano")
-# hookworm_df_andat <- hookworm_df %>%
-#   filter(village == "Andatsakala")
-# 
-# table1 <- hookworm_df_man %>%
-#   gtsummary::tbl_summary(include = c(dog_hookworm),
-#               by = cluster_assignment, missing = "ifany")
-# table2 <- hookworm_df_sara %>%
-#   gtsummary::tbl_summary(include = c(dog_hookworm, gender, school_level),
-#                          by = cluster_assignment, missing = "ifany")
-# table3 <- hookworm_df_andat %>%
-#   gtsummary::tbl_summary(include = c(dog_hookworm),
-#                          by = cluster_assignment, missing = "ifany")
-# 
-# table4 <- gtsummary::tbl_merge(tbls = list(table1, table2, table3))
-# 
-# ###########
-# ## Modeling
-# ###########
-# 
-# # change cluster assignment to factor
-# hookworm_df_man <- hookworm_df_man %>%
-#   mutate(cluster_assignment = as.factor(cluster_assignment))
-# hookworm_df_sara <- hookworm_df_sara %>%
-#   mutate(cluster_assignment = as.factor(cluster_assignment))
-# hookworm_df_andat <- hookworm_df_andat %>%
-#   mutate(cluster_assignment = as.factor(cluster_assignment))
-# 
-# # drop cluster 4 from sara with one participant
-# hookworm_df_sara <- hookworm_df_sara %>%
-#   filter(cluster_assignment != 4)
-# 
-# # build global models
-# 
-# man_global <- glm(dog_hookworm ~
-#                     age +
-#                     gender +
-#                     school_level +
-#                     cluster_assignment,
-#                   data = hookworm_df_man,
-#                   family = "binomial",
-#                   na.action = na.fail)
-# summary(man_global)
-# 
-# hookworm_df_sara <- hookworm_df_sara %>%
-#   mutate(cluster_assignment = relevel(cluster_assignment, ref = "2"))
-# 
-# sara_global <- glm(dog_hookworm ~
-#                     age +
-#                     gender +
-#                     school_level +
-#                     pet_dogs +
-#                     cluster_assignment,
-#                     #pet_dogs*cluster_assignment,
-#                   data = hookworm_df_sara,
-#                   family = "binomial",
-#                   na.action = na.fail)
-# summary(sara_global)
-# model_output <- summary(sara_global)
-# model_output <- as.data.frame(model_output$coefficients)
-# model_output <- rownames_to_column(model_output, var = "Term")
-# performance::check_model(sara_global)
-# 
-# # Calculate Odds Ratios and 95% Confidence Intervals
-# model_output$OddsRatio <- exp(model_output$Estimate)
-# model_output$LowerCI <- exp(model_output$Estimate - 1.96 * model_output$`Std. Error`)
-# model_output$UpperCI <- exp(model_output$Estimate + 1.96 * model_output$`Std. Error`)
-# 
-# # Prepare data for plotting
-# plot_data <- model_output %>%
-#   select(Term, OddsRatio, LowerCI, UpperCI) %>%
-#   mutate(Term = factor(Term, levels = Term)) %>%
-#   filter(Term != "(Intercept)")
-# 
-# # Plotting the Forest Plot
-# ggplot(plot_data, aes(x = Term, y = OddsRatio, ymin = LowerCI, ymax = UpperCI)) +
-#   geom_point() +
-#   geom_errorbar(aes(ymin = LowerCI, ymax = UpperCI), width = 0.2) +
-#   coord_flip() +
-#   theme_minimal() +
-#   xlab("Variable") +
-#   ylab("Odds Ratio (95% CI)") +
-#   ggtitle("Forest Plot of Model Estimates")
-# 
-# plot_data <- plot_data %>%
-#   mutate(Term = recode(Term,
-#                               "genderMale" = "Gender (Men vs. Women)",
-#                               "school_level≥ Secondary" = "Education (≥ Secondary vs. Less)",
-#                               "pet_dogsYes" = "Own Dogs (Yes vs. No)",
-#                               "cluster_assignment1" = "Role 1 (vs. Role 2)",
-#                               "cluster_assignment3" = "Role 3 (vs. Role 2)",
-#                               "age" = "Age"))
-# 
-# p6 <- ggplot(plot_data, aes(x = fct_rev(Term), y = OddsRatio, ymin = LowerCI, ymax = UpperCI)) +
-#   geom_hline(yintercept=1, lty=2) +  # add a dotted line at x=1 after flip
-#   geom_errorbar(aes(xmin = LowerCI, xmax = UpperCI), size = 2, width = 0.2) +
-#   geom_point(aes(x = fct_rev(Term)), size = 8, color = "purple", alpha = 100) +
-#   geom_point(shape = 1,size = 8, stroke = 1.5, color = "black") +
-#   coord_flip() +  # flip coordinates (puts labels on y axis)
-#   xlab("") + ylab("Odds Ratio (95% Confidince Interval)") + 
-#   scale_x_discrete(limits = c("Role 3 (vs. Role 2)", "Role 1 (vs. Role 2)", "Own Dogs (Yes vs. No)",
-#                               "Education (≥ Secondary vs. Less)", "Gender (Men vs. Women)", "Age")) +
-#   theme_classic() +
-#   theme(axis.text.y = element_text(size = 24, color = "black")) +
-#   theme(axis.text.x = element_text(size = 24, color = "black")) +
-#   theme(axis.title.y = element_text(size = 24)) +
-#   theme(axis.title.x = element_text(size = 24)) +
-#   theme(plot.title = element_text(hjust = 0.5))
-# 
-# ggsave("dog_coef_plot.png", p6, width = 13)
-# 
-# 
-# # use dredge for model comparison
-# sara_global_dredge <- dredge(sara_global)
-# 
-# # average models with delta AICc < 2
-# sara_global_avg <- model.avg(sara_global_dredge, subset = delta < 10)
-# summary(sara_global_avg)
-# plot(sara_global_avg)
-# 
-# andat_global <- glm(dog_hookworm ~
-#                      age +
-#                      gender +
-#                      school_level +
-#                      cluster_assignment,
-#                    data = hookworm_df_andat,
-#                    family = "binomial",
-#                    na.action = na.fail)
-# summary(andat_global)
-# 
-# man_global <- glm(human_hookworm ~
-#                     age +
-#                     gender +
-#                     school_level +
-#                     cluster_assignment,
-#                   data = hookworm_df_man,
-#                   family = "binomial",
-#                   na.action = na.fail)
-# summary(man_global)
-# 
-# sara_global <- glm(human_hookworm ~
-#                      age +
-#                      gender +
-#                      school_level +
-#                      cluster_assignment,
-#                    data = hookworm_df_sara,
-#                    family = "binomial",
-#                    na.action = na.fail)
-# summary(sara_global)
-# 
-# andat_global <- glm(human_hookworm ~
-#                       age +
-#                       gender +
-#                       school_level +
-#                       cluster_assignment,
-#                     data = hookworm_df_andat,
-#                     family = "binomial",
-#                     na.action = na.fail)
-# summary(andat_global)
-
+# # Remove NAs for Modeling
+#   model_df <- na.omit(demo_df)
+#   
+# # Standardize Continuous Variables
+#   model_df <- model_df %>% 
+#     mutate(landsize_in_daba = datawizard::standardize(landsize_in_daba)) %>%
+#     mutate(household_size = datawizard::standardize(household_size)) %>%
+#     mutate(age = datawizard::standardize(age))
+#   
+# # Build Global Model for Human Hookworm
+#   m_human <- glm(human_hookworm ~ age + gender + school_level +
+#                  main_activity + household_size + material_floor + landsize_in_daba + village + group,
+#                 data = model_df,
+#                 family = "binomial",
+#                 na.action = na.fail)
+#   summary(m_human)
+#   performance::check_model(m_human)
+#   
+# # Use Dredge for Model Comparison
+#   m_human_dredge <- dredge(m_human)
+#   
+# # Average Models With Delta AICc < 2
+#   m_human_avg <- model.avg(m_human_dredge, subset = delta < 2)
+#   summary(m_human_avg)
+#   plot(m_human_avg, intercept = FALSE)
+#   
+# # Build Global Model for Human Hookworm
+#   m_dog <- glm(dog_hookworm ~ age + gender + school_level + main_activity + pet_dogs + 
+#                  household_size + material_floor + landsize_in_daba + village + group,
+#                  data = model_df,
+#                  family = "binomial",
+#                
+#                  na.action = na.fail)
+#   summary(m_dog)
+#   performance::check_model(m_dog)
+#   
+# # Use Dredge for Model Comparison
+#   m_dog_dredge <- dredge(m_dog)
+#   
+# # Average Models With Delta AICc < 2
+#   m_dog_avg <- model.avg(m_dog_dredge, subset = delta < 2)
+#   summary(m_dog_avg)
+#   plot(m_dog_avg, intercept = FALSE)
+#   
+#   all_dog <- glm(dog_hookworm ~
+#                    age +
+#                    gender +
+#                    school_level +
+#                    pet_dogs +
+#                    village +
+#                    group,
+#                  data = model_df,
+#                  family = "binomial")
+#   summary(all_dog)
 
