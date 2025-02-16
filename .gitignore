@@ -1,2 +1,7 @@
 .Rhistory
-/role_output.rds
+*.rds
+*.history
+*.csv
+*.png
+*.pdf
+*.gephi
