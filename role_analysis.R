@@ -684,7 +684,7 @@
       )
 
 ##################################################
-#   ASSOCIATION BETWEEN ROLES AND Virus Exposure #
+#   ASSOCIATION BETWEEN ROLES AND VIRUS EXPOSURE #
 ##################################################
 
 # Load Virscan Data
@@ -824,6 +824,8 @@
                fill = "Percent Exposed") +
           theme(axis.text.x = element_text(hjust = 1))
 
+# Compare Differences in Prevalence for Each Virus Across Roles
+# Correct for Multiple Comparisons
   
 # Species Richness Model
   demo_df <- demo_df %>%
