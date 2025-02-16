@@ -14,6 +14,7 @@
   library(ggraph)
   library(patchwork)
   library(ideanet)
+  library(MASS)
   library(MuMIn)
 
 # set File Path
@@ -26,6 +27,74 @@
 #################
 #   FUNCTIONS   #
 #################
+
+# Construct Networks for Each Relation
+  construct_networks <- function(el, relations, nl) {
+    networks <- list()
+    
+    for (i in relations) {
+      
+      # Filter Edgelist to Specified Relation
+        filtered_el <- el %>% filter(relation == i)
+      
+      # Create Network
+        network <- graph_from_data_frame(filtered_el, nl, directed = TRUE)
+      
+      # Store Network in List
+        networks[[i]] <- network
+    }
+    
+    return(networks)
+  }
+  
+# Compute Network Density and Summarize Centrality Measures
+  network_summary_metrics <- function(network) {
+    
+    # Compute Density
+      density <- igraph::edge_density(network)
+    
+    # Compute Centrality Measures
+      indegree <- degree(network, mode = "in")
+      outdegree <- degree(network, mode = "out")
+      total_degree <- degree(network)
+      betweenness <- betweenness(network)
+      #power <- power_centrality(network)$vector
+      eigenvector <- eigen_centrality(network)$vector
+      closeness <- closeness(network, mode = "total")
+    
+    # Store Centrality Measures in a Dataframe
+      centrality_df <- data.frame(
+        indegree = indegree,
+        outdegree = outdegree,
+        total_degree = total_degree,
+        betweenness = betweenness,
+        #power = power,
+        eigenvector = eigenvector,
+        closeness = closeness
+      )
+    
+    # Compute Means and Standard Deviations
+      centrality_summary <- centrality_df %>%
+        summarise(
+          mean_indegree = mean(indegree),
+          sd_indegree = sd(indegree),
+          mean_outdegree = mean(outdegree),
+          sd_outdegree = sd(outdegree),
+          mean_total_degree = mean(total_degree),
+          sd_total_degree = sd(total_degree),
+          mean_betweenness = mean(betweenness),
+          sd_betweenness = sd(betweenness),
+          #mean_power = mean(power),
+          #sd_power = sd(power),
+          mean_eigenvector = mean(eigenvector),
+          sd_eigenvector = sd(eigenvector),
+          mean_closeness = mean(closeness, na.rm = TRUE),
+          sd_closeness = sd(closeness, na.rm = TRUE),
+          density = density
+        )
+      
+    return(centrality_summary)
+  }
 
 # Triad and Centrality Summary Plots
   plot_role_summaries <- function(clustering_variables, cluster_groups) {
@@ -211,10 +280,69 @@
 
 # Read in Demographic Data
   demo_df <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Survey_Demographic_Health.csv"))
-
+  
+# Create Household Style of Life Index
+  # Wall Construction
+    demo_df <- demo_df %>%
+      mutate(material_wall_index = 0) %>%
+      mutate(material_wall_index = if_else(material_wall == "bamboo", 0, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "rafia", 0, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "ravenala", 0, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "mud", 0, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "compacted_earth", 0, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "wood_planks", 1, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "brick_unfired", 2, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "brick_fired", 2, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "metal_sheets", 3, material_wall_index)) %>%
+      mutate(material_wall_index = if_else(material_wall == "cement", 4, material_wall_index)) %>%
+      mutate(material_wall_index = scale(material_wall_index))
+    
+  # Roof Construction
+    demo_df <- demo_df %>%
+      mutate(material_roof_index = 0) %>%
+      mutate(material_roof_index = if_else(material_roof == "bamboo", 0, material_roof_index)) %>%
+      mutate(material_roof_index = if_else(material_roof == "thatch", 0, material_roof_index)) %>%
+      mutate(material_roof_index = if_else(material_roof == "metal_sheets", 1, material_roof_index)) %>%
+      mutate(material_roof_index = if_else(material_roof == "cement", 2, material_roof_index)) %>%
+      mutate(material_roof_index = scale(material_roof_index))
+    
+  # Floor Construction
+    demo_df <- demo_df %>%
+      mutate(material_floor_index = 0) %>%
+      mutate(material_floor_index = if_else(material_floor == "dirt", 0, material_floor_index)) %>%
+      mutate(material_floor_index = if_else(material_floor == "bamboo", 0, material_floor_index)) %>%
+      mutate(material_floor_index = if_else(material_floor == "rafia", 0, material_floor_index)) %>%
+      mutate(material_floor_index = if_else(material_floor == "ravinala", 0, material_floor_index)) %>%
+      mutate(material_floor_index = if_else(material_floor == "wood_planks", 1, material_floor_index)) %>%
+      mutate(material_floor_index = if_else(material_floor == "cement", 2, material_floor_index)) %>%
+      mutate(material_floor_index = scale(material_floor_index))
+    
+  # Sum Scores to Create Index
+    demo_df <- demo_df %>%
+      mutate(house_sol = material_wall_index + material_roof_index + material_floor_index) %>%
+      mutate(house_sol = as.numeric(house_sol))
+  
+# Create Durable Goods Owned Index
+    demo_df <- demo_df %>%
+      mutate(own_cellphone = if_else(own_cellphone == "Yes", 1, 0)) %>%
+      mutate(own_tv = if_else(own_tv == "Yes", 1, 0)) %>%
+      mutate(own_bicycle = if_else(own_bicycle == "Yes", 1, 0)) %>%
+      mutate(own_refrigerator = if_else(own_refrigerator == "Yes", 1, 0)) %>%
+      mutate(own_motorcycle = if_else(own_motorcycle == "Yes", 1, 0)) %>%
+      mutate(own_computer = if_else(own_computer == "Yes", 1, 0)) %>%
+      mutate(own_generator = if_else(own_generator == "Yes", 1, 0))
+  
+    demo_df <- demo_df %>%
+      mutate(goods_owned = own_cellphone + own_tv +own_bicycle + own_refrigerator +
+               own_motorcycle + own_computer + own_generator)
+  
+    demo_df$goods_owned <- as.numeric(demo_df$goods_owned)
+    hist(demo_df$goods_owned)
+  
 # Select Relevant Variables - Just Basic Demographics for Now
   demo_df <- demo_df %>%
-    select(social_netid, village, gender, age, school_level, main_activity)
+    select(social_netid, village, gender, age, school_level, main_activity,
+           house_sol, goods_owned, household_size)
 
 # Recode Ampandrana as Andatsakala
   demo_df <- demo_df %>%
@@ -271,15 +399,44 @@
   
 # Make Table 1 
   tbl1 <- demo_df %>%
-    tbl_summary(include = c(age, gender, school_level, main_activity),
+    tbl_summary(include = c(age, gender, school_level, main_activity,
+                            house_sol, goods_owned, household_size),
                 by = village,
                 missing = "ifany")
   tbl2 <- demo_df %>%
-    tbl_summary(include = c(age, gender, school_level, main_activity),
+    tbl_summary(include = c(age, gender, school_level, main_activity,
+                            house_sol, goods_owned, household_size),
                 missing = "ifany")
   # merge tables
     tbl_merge(tbls = list(tbl1, tbl2),
             tab_spanner = c("**Village**", "**All Villages**"))
+    
+# Construct All Five Networks for Each Village
+  relations <- c("freetime", "food_help_received", "food_help_provided", "farm_help_received", "farm_help_provided")
+  networks_mandena <- construct_networks(el_mandena, relations, nl_mandena)
+  networks_sarahandrano <- construct_networks(el_sarahandrano, relations, nl_sarahandrano)
+  networks_andatsakala <- construct_networks(el_andatsakala, relations, nl_andatsakala)
+  
+# Compute Density and Mean Std. Centrality
+  villages <- c("mandena", "sarahandrano", "andatsakala")
+  net_summaries <- data.frame()
+  for (village in villages) {
+    for (relation in relations) {
+      
+      # Get Network
+        network <- get(paste0("networks_", village))[[relation]]
+      
+      # Compute Summary Stats
+        summary_stats <- network_summary_metrics(network)
+      
+      # Add Village and Relation
+        summary_stats$village <- village
+        summary_stats$relation <- relation
+      
+      # Add to Dataframe
+        net_summaries <- bind_rows(net_summaries, summary_stats)
+    }
+  }
     
 # Create a Weighted Edgelist for Visualizing the Networks
   el_weighted_mandena <- el_mandena %>%
@@ -458,9 +615,9 @@
 # Save Output
 # saveRDS(role_analysis_list, "role_output.rds")
  role_analysis_list <- read_rds("C:/Users/tmbar/OneDrive/Documents/GitHub/role_analysis/role_output.rds")
+ role_analysis_list <- read_rds("/Users/tylerbarrett/Documents/GitHub/role_analysis/role_output.rds")
 
 # Plot Triad and Centrality Summaries
- 
  # Assign Cluster Groups
    cluster_groups_man <- list(
      most_popular = c(7),
@@ -477,7 +634,6 @@
      core = c(3),
      periphery = c(1,4)
    )
-   
     man_summary_plots <- plot_role_summaries(role_analysis_list$mandena$clustering_variables, cluster_groups_man)
     sara_summary_plots <- plot_role_summaries(role_analysis_list$sarahandrano$clustering_variables, cluster_groups_sara)
     andat_summary_plots <- plot_role_summaries(role_analysis_list$andatsakala$clustering_variables, cluster_groups_andat)
@@ -521,7 +677,8 @@
       
     demo_df %>%
       tbl_summary(
-        include = c(age, gender, school_level, main_activity),
+        include = c(age, gender, school_level, main_activity,
+                    house_sol, goods_owned, household_size),
         by = group,  # Group by the new combined variable
         missing = "ifany"
       )
@@ -531,27 +688,31 @@
 ##################################################
 
 # Load Virscan Data
-  virscan1 <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Virscan/C5/C5_All_HitsList.csv")
-  virscan2 <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Virscan/C10/C10_All_HitsList.csv")
+  virscan1 <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Virscan/C5/C5_All_HitsList.csv"))
+  virscan1 <- virscan1 %>%
+    mutate(run = "C5")
+  virscan2 <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Virscan/C10/C10_All_HitsList.csv"))
+  virscan2 <- virscan2 %>%
+    mutate(run = "C10")
   virscan <- bind_rows(virscan1,virscan2)
   
-# Simplify Data and Compute Virus Family Richness
+# Simplify Data and Compute Virus Species Richness
   virscan <- virscan %>%
     mutate(social_netid = str_remove(sample_name, " FTA| W903")) %>%
     mutate(social_netid = sub("A-SNH", "A.SNH", social_netid)) %>%
     mutate(social_netid = sub("D-SNH", "D.SNH", social_netid)) %>%
     mutate(social_netid = sub("E-SNH", "E.SNH", social_netid)) %>%
     filter(grepl("SNH", social_netid)) %>%
-    select(social_netid, uniprot_family, uniprot_specie, virus_pos) %>%
+    select(social_netid, run, uniprot_family, uniprot_specie, virus_pos) %>%
     group_by(social_netid, uniprot_specie) %>%
     mutate(virus_pos = if_else(any(virus_pos == TRUE), 1, 0)) %>%
     ungroup() %>%
-    select(social_netid, uniprot_specie, virus_pos) %>%
+    select(social_netid, run, uniprot_specie, virus_pos) %>%
     distinct() %>%
     pivot_wider(names_from = uniprot_specie,
                 values_from = virus_pos,
                 values_fill = list(virus_pos = 0)) %>%
-    mutate(species_richness = rowSums(select(., -social_netid), na.rm = TRUE))
+    mutate(species_richness = rowSums(select(., -social_netid, -run), na.rm = TRUE))
 
 # Join with Demographic Data
   demo_df <- demo_df %>%
@@ -575,7 +736,7 @@
   # Plot Species Prevalence by Role  
     # Both Villages Combined
       exposure_summary_all_villages_df <- demo_df %>%
-        select(group, social_netid, c(9:343)) %>% 
+        select(group, social_netid, c(13:348)) %>% 
         pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
         complete(group, virus, fill = list(positive = 0)) %>%
         group_by(group, virus) %>%
@@ -664,29 +825,37 @@
           theme(axis.text.x = element_text(hjust = 1))
 
   
-# Initial model, try zero inflated model  
+# Species Richness Model
   demo_df <- demo_df %>%
     mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
   
   model_df <- demo_df %>%
-    select(social_netid, village, age, gender, school_level, main_activity, group, species_richness)
+    select(social_netid, village, age, gender, school_level, main_activity,
+           house_sol, goods_owned, household_size, group, species_richness)
   model_df = na.omit(model_df)
   
-  m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + village + group,
+  # Standardize Continuous Predictor Variables
+    model_df <- model_df %>%  
+      mutate(age = datawizard::standardize(age)) %>%
+      mutate(goods_owned = datawizard::standardize(goods_owned)) %>%
+      mutate(household_size = datawizard::standardize(household_size))
+  
+  # Specify Global Model
+    m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + 
+                     house_sol + goods_owned + household_size + village + group,
                data = model_df,
                family = "poisson",
-               
                na.action = na.fail)
-  summary(m_viruses)
-  performance::check_model(m_viruses)
+    summary(m_viruses)
+    performance::check_model(m_viruses)
   
   # Use Dredge for Model Comparison
-  m_viruses_dredge <- dredge(m_viruses)
+    m_viruses_dredge <- dredge(m_viruses)
   
   # Average Models With Delta AICc < 2
-  m_viruses_avg <- model.avg(m_viruses_dredge, subset = delta < 2)
-  summary(m_viruses_avg)
-  plot(m_viruses_avg, intercept = FALSE)
+    m_viruses_avg <- model.avg(m_viruses_dredge, subset = delta < 2)
+    summary(m_viruses_avg)
+    plot(m_viruses_avg, intercept = FALSE)
 
 #######################
 #   HOOKWORM ANALYSIS #
