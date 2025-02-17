@@ -14,7 +14,6 @@
   library(ggraph)
   library(patchwork)
   library(ideanet)
-  library(MASS)
   library(MuMIn)
 
 # set File Path
@@ -50,15 +49,19 @@
 # Compute Network Density and Summarize Centrality Measures
   network_summary_metrics <- function(network) {
     
+    # Get Node and Edge Counts
+      nodes <- gorder(network)
+      edges <- gsize(network)
+    
     # Compute Density
       density <- igraph::edge_density(network)
-    
+      
     # Compute Centrality Measures
       indegree <- degree(network, mode = "in")
       outdegree <- degree(network, mode = "out")
       total_degree <- degree(network)
       betweenness <- betweenness(network)
-      #power <- power_centrality(network)$vector
+      power <- power_centrality(network, exponent = 0.1)
       eigenvector <- eigen_centrality(network)$vector
       closeness <- closeness(network, mode = "total")
     
@@ -68,7 +71,7 @@
         outdegree = outdegree,
         total_degree = total_degree,
         betweenness = betweenness,
-        #power = power,
+        power = power,
         eigenvector = eigenvector,
         closeness = closeness
       )
@@ -84,13 +87,15 @@
           sd_total_degree = sd(total_degree),
           mean_betweenness = mean(betweenness),
           sd_betweenness = sd(betweenness),
-          #mean_power = mean(power),
-          #sd_power = sd(power),
+          mean_power = mean(power),
+          sd_power = sd(power),
           mean_eigenvector = mean(eigenvector),
           sd_eigenvector = sd(eigenvector),
           mean_closeness = mean(closeness, na.rm = TRUE),
           sd_closeness = sd(closeness, na.rm = TRUE),
-          density = density
+          density = density,
+          nodes = nodes,
+          edges = edges
         )
       
     return(centrality_summary)
@@ -437,6 +442,9 @@
         net_summaries <- bind_rows(net_summaries, summary_stats)
     }
   }
+  
+# Save Table as .csv (Supplemental Table 1)
+  # write.csv(net_summaries, "net_summaries.csv")
     
 # Create a Weighted Edgelist for Visualizing the Networks
   el_weighted_mandena <- el_mandena %>%
