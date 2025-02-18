@@ -444,7 +444,7 @@
   }
   
 # Save Table as .csv (Supplemental Table 1)
-  # write.csv(net_summaries, "net_summaries.csv")
+   write.csv(net_summaries, "net_summaries.csv")
     
 # Create a Weighted Edgelist for Visualizing the Networks
   el_weighted_mandena <- el_mandena %>%
@@ -466,79 +466,85 @@
   # Define edge thickness scale
     edge_thickness_range <- c(0.5, 2)
     
-  # Compute in-degree centrality
-    V(mandena_net)$indegree <- degree(mandena_net, mode = "in")
-    V(sarahandrano_net)$indegree <- degree(sarahandrano_net, mode = "in")
-    V(andatsakala_net)$indegree <- degree(andatsakala_net, mode = "in")
+  # Compute Strength Centrality
+    V(mandena_net)$strength <- strength(mandena_net)
+    V(sarahandrano_net)$strength <- strength(sarahandrano_net)
+    V(andatsakala_net)$strength <- strength(andatsakala_net)
     
-  # Define the five distinct edge weight levels
+  # Define Edge Weights
     unique_weights <- sort(unique(E(mandena_net)$weight))
   
-  # Plot with node size based on in-degree centrality
-    # Create individual plots
-    plot_mandena <- ggraph(mandena_net, layout = "stress") +  
-      geom_edge_link(aes(color = weight), 
-                     alpha = 1,  
-                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
-      geom_node_point(aes(size = indegree), color = "darkred") +  
-      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
-      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                 values = scales::rescale(unique_weights), 
-                                 name = "Edge Weight") +  
-      guides(size = guide_legend(order = 1), 
-             color = guide_colorbar(order = 2)) +
-      theme_void() + 
-      ggtitle("Village A") +  
-      theme(text = element_text(size = 30),  
-            plot.title = element_text(size = 30, face = "bold"),
-            legend.text = element_text(size = 25),
-            legend.title = element_text(size = 25, vjust = 3),
-            legend.spacing = unit(2, "cm"))
-    
-    plot_sarahandrano <- ggraph(sarahandrano_net, layout = "stress") +  
-      geom_edge_link(aes(color = weight), 
-                     alpha = 1,  
-                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
-      geom_node_point(aes(size = indegree), color = "darkred") +  
-      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
-      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                 values = scales::rescale(unique_weights), 
-                                 name = "Edge Weight") +  
-      guides(size = guide_legend(order = 1), 
-             color = guide_colorbar(order = 2)) +
-      theme_void() + 
-      ggtitle("Village B") +  
-      theme(text = element_text(size = 30),
-            plot.title = element_text(size = 30, face = "bold"),
-            legend.text = element_text(size = 25),
-            legend.title = element_text(size = 25, vjust = 3),
-            legend.spacing = unit(2, "cm"))
-    
-    plot_andatsakala <- ggraph(andatsakala_net, layout = "stress") +  
-      geom_edge_link(aes(color = weight), 
-                     alpha = 1,  
-                     arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
-      geom_node_point(aes(size = indegree), color = "darkred") +  
-      scale_size_continuous(range = c(1, 8), name = "In-Degree Centrality") +  
-      scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                 values = scales::rescale(unique_weights), 
-                                 name = "Edge Weight") +
-      guides(size = guide_legend(order = 1), 
-             color = guide_colorbar(order = 2)) +
-      theme_void() + 
-      ggtitle("Village C") +  
-      theme(text = element_text(size = 30),
-            plot.title = element_text(size = 30, face = "bold"),
-            legend.text = element_text(size = 25),
-            legend.title = element_text(size = 25, vjust = 3),
-            legend.spacing = unit(2, "cm"))
-    
+  # Create Plots
+      plot_mandena <- ggraph(mandena_net, layout = "stress") +  
+        geom_edge_link(aes(color = weight), 
+                       alpha = 1,  
+                       arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+        geom_node_point(aes(size = strength), color = "darkred") +  
+        scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
+        scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                   values = scales::rescale(unique_weights), 
+                                   name = "Edge Weight") +  
+        guides(size = guide_legend(order = 1), 
+               color = guide_colorbar(order = 2)) +
+        theme_void() + 
+        ggtitle("Village A") +  
+        theme(text = element_text(size = 30),  
+              plot.title = element_text(size = 30, face = "bold"),
+              legend.text = element_text(size = 25),
+              legend.title = element_text(size = 25, vjust = 3),
+              legend.spacing = unit(2, "cm"))
+      
+      plot_sarahandrano <- ggraph(sarahandrano_net, layout = "stress") +  
+        geom_edge_link(aes(color = weight), 
+                       alpha = 1,  
+                       arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+        geom_node_point(aes(size = strength), color = "darkred") +  
+        scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
+        scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                   values = scales::rescale(unique_weights), 
+                                   name = "Edge Weight") +  
+        guides(size = guide_legend(order = 1), 
+               color = guide_colorbar(order = 2)) +
+        theme_void() + 
+        ggtitle("Village B") +  
+        theme(text = element_text(size = 30),
+              plot.title = element_text(size = 30, face = "bold"),
+              legend.text = element_text(size = 25),
+              legend.title = element_text(size = 25, vjust = 3),
+              legend.spacing = unit(2, "cm"))
+      
+      plot_andatsakala <- ggraph(andatsakala_net, layout = "stress") +  
+        geom_edge_link(aes(color = weight), 
+                       alpha = 1,  
+                       arrow = arrow(type = "closed", length = unit(2, "mm"))) +    
+        geom_node_point(aes(size = strength), color = "darkred") +  
+        scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
+        scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
+                                   values = scales::rescale(unique_weights), 
+                                   name = "Edge Weight") +
+        guides(size = guide_legend(order = 1), 
+               color = guide_colorbar(order = 2)) +
+        theme_void() + 
+        ggtitle("Village C") +  
+        theme(text = element_text(size = 30),
+              plot.title = element_text(size = 30, face = "bold"),
+              legend.text = element_text(size = 25),
+              legend.title = element_text(size = 25, vjust = 3),
+              legend.spacing = unit(2, "cm"))
+      
     # Combine the plots in a single column (3 rows)
-    final_plot <- plot_mandena / plot_sarahandrano / plot_andatsakala
+      final_plot <- plot_mandena / plot_sarahandrano / plot_andatsakala
     
     # Display the combined plot
-    print(final_plot)
-  
+      print(final_plot)
+    
+    # Compute Descriptive Statistics for Summary Networks
+      mean(strength(mandena_net))
+      sd(strength(mandena_net))
+      mean(strength(sarahandrano_net))
+      sd(strength(sarahandrano_net))
+      mean(strength(andatsakala_net))
+      sd(strength(andatsakala_net))
 
 #######################################
 #   REFORMAT DATA FOR ROLE ANALYSIS   #
@@ -690,6 +696,27 @@
         by = group,  # Group by the new combined variable
         missing = "ifany"
       )
+    
+  # Compute Median (IQR) for Durable Goods Owned  
+    demo_df %>%
+      group_by(village) %>%
+      summarise(
+        median_goods = mean(goods_owned, na.rm = TRUE),
+        Q1 = quantile(goods_owned, 0.25, na.rm = TRUE),
+        Q3 = quantile(goods_owned, 0.75, na.rm = TRUE),
+        IQR_goods = IQR(goods_owned, na.rm = TRUE)
+      ) %>%
+      bind_rows(
+        demo_df %>%
+          summarise(
+            village = "All Villages",
+            median_goods = mean(goods_owned, na.rm = TRUE),
+            Q1 = quantile(goods_owned, 0.25, na.rm = TRUE),
+            Q3 = quantile(goods_owned, 0.75, na.rm = TRUE),
+            IQR_goods = IQR(goods_owned, na.rm = TRUE)
+          )
+      )
+    
 
 ##################################################
 #   ASSOCIATION BETWEEN ROLES AND VIRUS EXPOSURE #
