@@ -858,17 +858,86 @@
                y = "Virus Species",
                fill = "Percent Exposed") +
           theme(axis.text.x = element_text(hjust = 1))
-
-# Compare Differences in Prevalence for Each Virus Across Roles
-# Correct for Multiple Comparisons
   
-# Species Richness Model
+# Compare Differences in Prevalence for Each Virus Across Roles
+        # Reshape data to long format for easy iteration
+        long_df <- demo_df %>%
+          pivot_longer(cols = 13:347, names_to = "virus", values_to = "infected") %>%
+          mutate(group = as.factor(group))
+        
+        # Calculate prevalence for each virus
+        virus_prevalence <- long_df %>%
+          group_by(virus) %>%
+          summarize(prevalence = mean(infected)) %>%
+          filter(prevalence > 0.10)  # Keep only viruses with >10% prevalence
+        
+        # Filter data to include only prevalent viruses
+        long_df <- long_df %>% filter(virus %in% virus_prevalence$virus)
+        
+        # Define an empty list to store models
+        models <- list()
+        
+        # Loop through each prevalent virus and fit a separate Bayesian logistic regression model
+        for (virus in unique(long_df$virus)) {
+          virus_data <- filter(long_df, virus == !!virus)
+          
+          # Fit Bayesian logistic regression model
+          models[[virus]] <- brm(
+            infected ~ group, 
+            data = virus_data, 
+            family = bernoulli(),
+            prior = c(prior(normal(0, 1), class = "b"),
+                      prior(normal(0, 2), class = "Intercept")),
+            iter = 4000, warmup = 1000, chains = 4, cores = 4,
+            silent = TRUE
+          )
+        }
+        
+        # Create an empty data frame to store results
+        results <- data.frame()
+        
+        # Extract posterior samples for each group effect
+        posterior_data <- data.frame()
+        
+        for (virus in names(models)) {
+          post_samples <- as_draws_df(models[[virus]]) %>%  # Extract posterior samples
+            as.data.frame() %>%  # Convert to regular data frame to avoid warning
+            select(contains("b_group")) %>%  # Extract group effect coefficients
+            pivot_longer(cols = everything(), names_to = "group", values_to = "estimate") %>%
+            mutate(virus = virus)
+          
+          posterior_data <- bind_rows(posterior_data, post_samples)
+        }
+        
+        # Create posterior distribution ridge plot
+        ggplot(posterior_data, aes(x = estimate, y = virus, fill = group)) +
+          geom_density_ridges(alpha = 0.7, scale = 1) +  # Set bandwidth to avoid message
+          geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  # Reference line at 0
+          scale_x_continuous(limits = c(-3, 3), breaks = seq(-3, 3, by = 0.5)) +  # Set x-axis limits & ticks
+          scale_fill_manual(name = "Role Categories", 
+                            values = c("b_groupCore" = "#ff7f0e", "b_groupMostPopular" = "#1f77b4"),  # Custom colors
+                            labels = c("b_groupCore" = "Core", "b_groupMostPopular" = "Most Popular")) +  # Rename legend labels
+          labs(x = "Effect Size (Log-Odds)",
+               y = "Virus",
+               fill = "Role Categories") +  # Notes reference category
+          theme_bw() + 
+          theme(legend.position = "top",
+                axis.text = element_text(size = 18, face = "bold", color = "black"),  # Make axis text bold
+                axis.title = element_text(size = 24, face = "bold"),  # Make axis titles bold
+                legend.text = element_text(size = 24, face = "bold"),  # Make legend text bold
+                legend.title = element_text(size = 24, face = "bold"),  # Make legend title bold
+                plot.title = element_text(size = 24, face = "bold", hjust = 0.5),  # Center title and make bold
+                plot.subtitle = element_text(size = 24, face = "bold", hjust = 0.5),  # Center subtitle
+                plot.caption = element_text(size = 20, face = "italic"))  # Make caption italic for clarity
+
+        
+# Create Modeling Subset
   demo_df <- demo_df %>%
     mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
-  
+        
   model_df <- demo_df %>%
     select(social_netid, village, age, gender, school_level, main_activity,
-           house_sol, goods_owned, household_size, group, species_richness)
+    house_sol, goods_owned, household_size, group, species_richness)
   model_df = na.omit(model_df)
   
   # Standardize Continuous Predictor Variables
