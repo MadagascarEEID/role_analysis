@@ -12,8 +12,10 @@
   library(gtsummary)
   library(igraph)
   library(ggraph)
+  library(ggridges)
   library(patchwork)
   library(ideanet)
+  library(brms)
   library(MuMIn)
 
 # set File Path
@@ -731,6 +733,9 @@
     mutate(run = "C10")
   virscan <- bind_rows(virscan1,virscan2)
   
+# Count Number of Viruses in Panel
+  length(unique(virscan$uniprot_specie)) # 337
+  
 # Simplify Data and Compute Virus Species Richness
   virscan <- virscan %>%
     mutate(social_netid = str_remove(sample_name, " FTA| W903")) %>%
@@ -766,7 +771,7 @@
       geom_point(position = position_jitter(width = 0.2)) +
       labs(x = "Group", y = "Species Richness") +
       theme_minimal() +
-      facet_wrap(~ village, scales = "free") 
+      facet_wrap(~ village, scales = "free")
   
   # Plot Species Prevalence by Role  
     # Both Villages Combined
@@ -788,16 +793,22 @@
         group_by(virus) %>%
         filter(sum(percentage > 0) > 0) %>% 
         arrange(group, virus)
+  
+    # Count Total Viruses with ≥ 1 Positive Individual
+      length(unique(exposure_summary_all_villages_df$virus))
       
       ggplot(exposure_summary_all_villages_df, aes(x = group, y = virus, fill = percentage)) +
         geom_tile() +
         scale_fill_gradient(low = "white", high = "maroon") +
         theme_minimal() +
-        labs(title = "Viral Exposure by Role Type",
-             x = "Role Type",
+        labs(x = "Role Category",
              y = "Virus Species",
-             fill = "Percent Exposed") +
-        theme(axis.text.x = element_text(hjust = 1))
+             fill = "Seroprevalence (%)") +
+        theme(axis.text.x = element_text(hjust = 1),
+              axis.text = element_text(size = 18, color = "black"),
+              axis.title = element_text(size = 18),
+              legend.title = element_text(size = 18),
+              legend.text = element_text(size = 18))
       
       # Sarahandrano
         exposure_summary_sara_df <- demo_df %>%
@@ -859,29 +870,24 @@
                fill = "Percent Exposed") +
           theme(axis.text.x = element_text(hjust = 1))
   
-# Compare Differences in Prevalence for Each Virus Across Roles
-        # Reshape data to long format for easy iteration
-        long_df <- demo_df %>%
-          pivot_longer(cols = 13:347, names_to = "virus", values_to = "infected") %>%
-          mutate(group = as.factor(group))
+# Compare Differences in Prevalence for Each Virus Across Role Categories
+  # Bivariate Bayesian Logistic Regression Models
+    # Reformat Data for Modeling and Limit to Viruses with > 10% Seroprevalence
+      model_df_1 <- demo_df %>%
+        pivot_longer(cols = 13:347, names_to = "virus", values_to = "infected") %>%
+        mutate(group = as.factor(group))
+      virus_prevalence <- model_df_1 %>%
+        group_by(virus) %>%
+        summarize(prevalence = mean(infected)) %>%
+        filter(prevalence > 0.10)
+      model_df_1 <- model_df_1 %>% filter(virus %in% virus_prevalence$virus)
+      
+    # Initialize Empty List to Store Model Output
+      models <- list()
         
-        # Calculate prevalence for each virus
-        virus_prevalence <- long_df %>%
-          group_by(virus) %>%
-          summarize(prevalence = mean(infected)) %>%
-          filter(prevalence > 0.10)  # Keep only viruses with >10% prevalence
-        
-        # Filter data to include only prevalent viruses
-        long_df <- long_df %>% filter(virus %in% virus_prevalence$virus)
-        
-        # Define an empty list to store models
-        models <- list()
-        
-        # Loop through each prevalent virus and fit a separate Bayesian logistic regression model
-        for (virus in unique(long_df$virus)) {
-          virus_data <- filter(long_df, virus == !!virus)
-          
-          # Fit Bayesian logistic regression model
+    # Fit Separate Model for Each Virus
+      for (virus in unique(model_df_1$virus)) {
+        virus_data <- filter(model_df_1, virus == !!virus)
           models[[virus]] <- brm(
             infected ~ group, 
             data = virus_data, 
@@ -889,67 +895,64 @@
             prior = c(prior(normal(0, 1), class = "b"),
                       prior(normal(0, 2), class = "Intercept")),
             iter = 4000, warmup = 1000, chains = 4, cores = 4,
-            silent = TRUE
+            silent = FALSE
           )
-        }
+      }
+      
+    # Save Model Output
+      # saveRDS(models, "/Users/tylerbarrett/Library/CloudStorage/OneDrive-DukeUniversity/Active Projects/Role Analysis/Data/bayes_model_output.rds")
+      
+    # Create Dataframe to Store Model Results
+      results <- data.frame()
         
-        # Create an empty data frame to store results
-        results <- data.frame()
-        
-        # Extract posterior samples for each group effect
-        posterior_data <- data.frame()
-        
+    # Extract Posterior Samples
+      posterior_data <- data.frame()
         for (virus in names(models)) {
-          post_samples <- as_draws_df(models[[virus]]) %>%  # Extract posterior samples
-            as.data.frame() %>%  # Convert to regular data frame to avoid warning
-            select(contains("b_group")) %>%  # Extract group effect coefficients
+          post_samples <- as_draws_df(models[[virus]]) %>%
+            as.data.frame() %>%
+            select(contains("b_group")) %>%
             pivot_longer(cols = everything(), names_to = "group", values_to = "estimate") %>%
             mutate(virus = virus)
-          
           posterior_data <- bind_rows(posterior_data, post_samples)
         }
         
-        # Create posterior distribution ridge plot
-        ggplot(posterior_data, aes(x = estimate, y = virus, fill = group)) +
-          geom_density_ridges(alpha = 0.7, scale = 1) +  # Set bandwidth to avoid message
-          geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  # Reference line at 0
-          scale_x_continuous(limits = c(-3, 3), breaks = seq(-3, 3, by = 0.5)) +  # Set x-axis limits & ticks
-          scale_fill_manual(name = "Role Categories", 
-                            values = c("b_groupCore" = "#ff7f0e", "b_groupMostPopular" = "#1f77b4"),  # Custom colors
-                            labels = c("b_groupCore" = "Core", "b_groupMostPopular" = "Most Popular")) +  # Rename legend labels
-          labs(x = "Effect Size (Log-Odds)",
+    # Plot Posterior Distributions
+      ggplot(posterior_data, aes(x = estimate, y = virus, fill = group)) +
+        geom_density_ridges(alpha = 0.7, scale = 1) + 
+        geom_vline(xintercept = 0, linetype = "dashed", color = "black") + 
+        scale_x_continuous(limits = c(-3, 3), breaks = seq(-3, 3, by = 0.5)) + 
+        scale_fill_manual(name = "Role Categories", 
+                            values = c("b_groupCore" = "#ff7f0e", "b_groupMostPopular" = "#1f77b4"),
+                            labels = c("b_groupCore" = "Core", "b_groupMostPopular" = "Most Popular")) + 
+        labs(x = "Effect Size (Log-Odds)",
                y = "Virus",
-               fill = "Role Categories") +  # Notes reference category
-          theme_bw() + 
-          theme(legend.position = "top",
-                axis.text = element_text(size = 18, face = "bold", color = "black"),  # Make axis text bold
-                axis.title = element_text(size = 24, face = "bold"),  # Make axis titles bold
-                legend.text = element_text(size = 24, face = "bold"),  # Make legend text bold
-                legend.title = element_text(size = 24, face = "bold"),  # Make legend title bold
-                plot.title = element_text(size = 24, face = "bold", hjust = 0.5),  # Center title and make bold
-                plot.subtitle = element_text(size = 24, face = "bold", hjust = 0.5),  # Center subtitle
-                plot.caption = element_text(size = 20, face = "italic"))  # Make caption italic for clarity
+               fill = "Role Categories") + 
+        theme_bw() + 
+        theme(legend.position = "top",
+                axis.text = element_text(size = 18, face = "bold", color = "black"), 
+                axis.title = element_text(size = 24, face = "bold"), 
+                legend.text = element_text(size = 24, face = "bold"), 
+                legend.title = element_text(size = 24, face = "bold"))
 
-        
-# Create Modeling Subset
-  demo_df <- demo_df %>%
-    mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
-        
-  model_df <- demo_df %>%
-    select(social_netid, village, age, gender, school_level, main_activity,
-    house_sol, goods_owned, household_size, group, species_richness)
-  model_df = na.omit(model_df)
+# Predictors of Species Richness
+  # Prepare Data for Modeling    
+    demo_df <- demo_df %>%
+      mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
+    model_df_2 <- demo_df %>%
+      select(social_netid, village, age, gender, school_level, main_activity,
+      house_sol, goods_owned, household_size, group, species_richness)
+    model_df_2 = na.omit(model_df_2)
   
   # Standardize Continuous Predictor Variables
-    model_df <- model_df %>%  
-      mutate(age = datawizard::standardize(age)) %>%
-      mutate(goods_owned = datawizard::standardize(goods_owned)) %>%
-      mutate(household_size = datawizard::standardize(household_size))
+    model_df_2 <- model_df_2 %>%  
+        mutate(age = datawizard::standardize(age)) %>%
+        mutate(goods_owned = datawizard::standardize(goods_owned)) %>%
+        mutate(household_size = datawizard::standardize(household_size))
   
   # Specify Global Model
     m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + 
                      house_sol + goods_owned + household_size + village + group,
-               data = model_df,
+               data = model_df_2,
                family = "poisson",
                na.action = na.fail)
     summary(m_viruses)
@@ -962,125 +965,6 @@
     m_viruses_avg <- model.avg(m_viruses_dredge, subset = delta < 2)
     summary(m_viruses_avg)
     plot(m_viruses_avg, intercept = FALSE)
-
-#######################
-#   HOOKWORM ANALYSIS #
-####################### 
-  
-# # Prepare Data for Analysis and Join with Demographic Data
-#   hookworm_df <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/HUMAN_PARASITE_ALL_VILLAGE.csv")
-#   hookworm_df <- hookworm_df %>%
-#     select(social_netid, NC_reads, Necator_americanus, Ancylostoma_ceylanicum) %>%
-#     filter(NC_reads >= 500) %>% # filter based on 500 read cutoff
-#     mutate(social_netid = sub("A.SNH.", "A.SNH", social_netid)) %>%
-#     mutate(social_netid = sub("D.SNH.", "D.SNH", social_netid)) %>%
-#     mutate(social_netid = sub("E.SNH.", "E.SNH", social_netid)) %>%
-#     mutate(human_hookworm = if_else(Necator_americanus > 0, 1, 0)) %>%
-#     mutate(dog_hookworm = if_else(Ancylostoma_ceylanicum > 0, 1, 0)) %>%
-#     select(social_netid, human_hookworm, dog_hookworm)
-#   demo_df <- demo_df %>%
-#     left_join(hookworm_df, by = "social_netid")
-# 
-# # Load Animal Interaction Data to Get Dog Ownership & Join with Demographic Data
-#   animal_df <- read_csv("C:/Users/tmbar/Box/EEID_Data_public/clean_data_tables/Survey_Animal_Interaction.csv")
-#   animal_df <- animal_df %>%
-#     select(social_netid, pet_dogs)
-#   demo_df <- demo_df %>%
-#     left_join(animal_df)
-# 
-# # Relevel Education Variable
-#   demo_df <- demo_df %>%
-#     mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher"))) %>%
-#     mutate(school_level = recode(school_level, "None" = "< Secondary", "Primary" = "< Secondary",
-#                                  "Secondary" = "≥ Secondary", "Higher" = "≥ Secondary"))
-# 
-# # Relevel Groups
-#   demo_df <- demo_df %>%
-#     mutate(group = factor(group, levels = c("Periphery", "Core", "MostPopular")))
-#   
-#   demo_df <- demo_df %>%
-#     mutate(village = factor(village, levels = c("Mandena", "Sarahandrano", "Andatsakala")))
-#   
-#   demo_df <- demo_df %>%
-#     mutate(material_floor = factor(material_floor, level = c("dirt", "rafia", "ravenala",
-#                                                              "bamboo", "wood_planks", "cement"))) %>%
-#     mutate(material_floor = recode(material_floor, "rafia" = "ravenala"))
-#  
-# # Compute Prevalence by Role Group
-#   prevalence_data <- demo_df %>%
-#     group_by(group) %>%
-#     summarise(
-#       human_hookworm_prevalence = mean(human_hookworm, na.rm = TRUE),
-#       dog_hookworm_prevalence = mean(dog_hookworm, na.rm = TRUE),
-#       coinfection_prevalence = mean(human_hookworm & dog_hookworm, na.rm = TRUE)
-#     )
-#   prevalence_data_long <- prevalence_data %>%
-#     pivot_longer(cols = -group, names_to = "infection_type", values_to = "prevalence")
-#   ggplot(prevalence_data_long, aes(x = group, y = prevalence, fill = infection_type)) +
-#     geom_bar(stat = "identity", position = "dodge") +
-#     labs(
-#       title = "Prevalence of Hookworm Infections by Group",
-#       x = "Group",
-#       y = "Prevalence",
-#       fill = "Infection Type"
-#     ) +
-#     theme_minimal() +
-#     theme(axis.text.x = element_text(angle = 45, hjust = 1))
-#   
-# # Model the Relationship Between Roles and Hookworm Infection
-# 
-# # Remove NAs for Modeling
-#   model_df <- na.omit(demo_df)
-#   
-# # Standardize Continuous Variables
-#   model_df <- model_df %>% 
-#     mutate(landsize_in_daba = datawizard::standardize(landsize_in_daba)) %>%
-#     mutate(household_size = datawizard::standardize(household_size)) %>%
-#     mutate(age = datawizard::standardize(age))
-#   
-# # Build Global Model for Human Hookworm
-#   m_human <- glm(human_hookworm ~ age + gender + school_level +
-#                  main_activity + household_size + material_floor + landsize_in_daba + village + group,
-#                 data = model_df,
-#                 family = "binomial",
-#                 na.action = na.fail)
-#   summary(m_human)
-#   performance::check_model(m_human)
-#   
-# # Use Dredge for Model Comparison
-#   m_human_dredge <- dredge(m_human)
-#   
-# # Average Models With Delta AICc < 2
-#   m_human_avg <- model.avg(m_human_dredge, subset = delta < 2)
-#   summary(m_human_avg)
-#   plot(m_human_avg, intercept = FALSE)
-#   
-# # Build Global Model for Human Hookworm
-#   m_dog <- glm(dog_hookworm ~ age + gender + school_level + main_activity + pet_dogs + 
-#                  household_size + material_floor + landsize_in_daba + village + group,
-#                  data = model_df,
-#                  family = "binomial",
-#                
-#                  na.action = na.fail)
-#   summary(m_dog)
-#   performance::check_model(m_dog)
-#   
-# # Use Dredge for Model Comparison
-#   m_dog_dredge <- dredge(m_dog)
-#   
-# # Average Models With Delta AICc < 2
-#   m_dog_avg <- model.avg(m_dog_dredge, subset = delta < 2)
-#   summary(m_dog_avg)
-#   plot(m_dog_avg, intercept = FALSE)
-#   
-#   all_dog <- glm(dog_hookworm ~
-#                    age +
-#                    gender +
-#                    school_level +
-#                    pet_dogs +
-#                    village +
-#                    group,
-#                  data = model_df,
-#                  family = "binomial")
-#   summary(all_dog)
+    
+  # Plot Model Averaging Results
 
