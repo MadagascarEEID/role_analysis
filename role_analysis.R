@@ -281,9 +281,9 @@
   return(list(cluster_n = cluster_n, el = el))
 }
 
-#########################################
-#   CREATE NODE LIST FOR EACH VILLAGE   #
-#########################################
+###############################
+#   BRING IN NODE-LEVEL DATA  #
+###############################
 
 # Read in Demographic Data
   demo_df <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Survey_Demographic_Health.csv"))
@@ -358,14 +358,6 @@
       TRUE ~ village
     ))
 
-# Separate Node Lists for Each Village
-  nl_mandena <- demo_df %>%
-    filter(village == "Mandena")
-  nl_sarahandrano <- demo_df %>%
-    filter(village == "Sarahandrano")
-  nl_andatsakala <- demo_df %>%
-    filter(village == "Andatsakala")
-
 #######################################
 #   CREATE MULTIRELATIONAL EDGELIST   #
 #######################################
@@ -392,6 +384,19 @@
     filter(grepl("D.SNH", ego_id))
   el_andatsakala <- edgelist %>%
     filter(grepl("E.SNH", ego_id))
+  
+# ISOLATES NAMED OTHER PEOPLE BUT NOT OTHER PEOPLE WHO PARTICIPATED IN THE SURVEY
+  isolates_check <- demo_df %>%
+    filter(social_netid %in% edgelist$ego_id | social_netid %in% edgelist$alter_id)
+  setdiff(demo_df$social_netid, isolates_check$social_netid)
+  
+# Separate Node Lists for Each Village
+  nl_mandena <- demo_df %>%
+    filter(village == "Mandena")
+  nl_sarahandrano <- demo_df %>%
+    filter(village == "Sarahandrano")
+  nl_andatsakala <- demo_df %>%
+    filter(village == "Andatsakala")
   
 ##############################################
 #   CHARACTERIZE NETWORKS AND PARTICIPANTS   #
@@ -446,7 +451,7 @@
   }
   
 # Save Table as .csv (Supplemental Table 1)
-   write.csv(net_summaries, "net_summaries.csv")
+ #  write.csv(net_summaries, "net_summaries.csv")
     
 # Create a Weighted Edgelist for Visualizing the Networks
   el_weighted_mandena <- el_mandena %>%
@@ -630,9 +635,9 @@
 
 # Save Output
 # saveRDS(role_analysis_list, "role_output.rds")
- role_analysis_list <- read_rds("C:/Users/tmbar/OneDrive/Documents/GitHub/role_analysis/role_output.rds")
- role_analysis_list <- read_rds("/Users/tylerbarrett/Documents/GitHub/role_analysis/role_output.rds")
-
+  role_analysis_list <- read_rds("C:/Users/tmbar/OneDrive/Documents/GitHub/role_analysis/role_output.rds")
+  role_analysis_list <- read_rds("/Users/tylerbarrett/Documents/GitHub/role_analysis/role_output.rds")
+  
 # Plot Triad and Centrality Summaries
  # Assign Cluster Groups
    cluster_groups_man <- list(
@@ -719,6 +724,14 @@
           )
       )
     
+    demo_df %>%
+      group_by(group) %>%
+      summarise(
+        median_goods = mean(goods_owned, na.rm = TRUE),
+        Q1 = quantile(goods_owned, 0.25, na.rm = TRUE),
+        Q3 = quantile(goods_owned, 0.75, na.rm = TRUE),
+        IQR_goods = IQR(goods_owned, na.rm = TRUE)
+      )
 
 ##################################################
 #   ASSOCIATION BETWEEN ROLES AND VIRUS EXPOSURE #
@@ -966,5 +979,68 @@
     summary(m_viruses_avg)
     plot(m_viruses_avg, intercept = FALSE)
     
-  # Plot Model Averaging Results
+  # Plot Model Averaging Results # note -- add color gradiant for importance
+  # Create Dataframe for Plotting
+    m_viruses_summary <- summary(m_viruses_avg)
+    plot_df_richness <- as.data.frame(m_viruses_summary$coefmat.full)
+    plot_df_richness <- plot_df_richness %>%
+      mutate(CI.min = Estimate - 1.96 * `Std. Error`) %>%
+      mutate(CI.max = Estimate + 1.96 * `Std. Error`)
+    plot_df_richness <- rownames_to_column(plot_df_richness, "coefficient")
+    names(plot_df_richness) <- gsub(" ", "", names(plot_df_richness))
+    plot_df_richness <- plot_df_richness %>%
+      filter(coefficient != "(Intercept)") %>%
+      mutate(coefficient = recode(coefficient,
+                                  "age" = "Age",
+                                  "genderMale" = "Gender (Men vs. Women)",
+                                  "school_levelPrimary" = "Education (Primary vs. None)",
+                                  "school_levelSecondary" = "Education (Secondary vs. None)",
+                                  "school_levelHigher" = "Education (Higher vs. None)",
+                                  "main_activitynon-farmer" = "Occupation (Non Farmer vs. Farmer)",
+                                  "household_size" = "Household Size",
+                                  "house_sol" = "Household Lifestyle Index",
+                                  "villageSarahandrano" = "Village (B vs. C)",
+                                  "groupCore" = "Role Category (Core vs. Periphery)",
+                                  "groupMostPopular" = "Role Category (Most Popular vs. Periphery)"))
+  
+    # Add Variable Importance to Plot Dataframe
+      plot_df_richness <- plot_df_richness %>%
+        mutate(importance = case_when(
+          coefficient == "Role Category (Core vs. Periphery)" ~ "1",
+          coefficient == "Role Category (Most Popular vs. Periphery)" ~ "1",
+          coefficient == "Education (Primary vs. None)" ~ "1",
+          coefficient == "Education (Secondary vs. None)" ~ "1",
+          coefficient == "Education (Higher vs. None)" ~ "1",
+          coefficient == "Village (B vs. C)" ~ "1",
+          coefficient == "Age" ~ "0.42",
+          coefficient == "Household Size" ~ "0.32",
+          coefficient == "Household Lifestyle Index" ~ "0.22",
+          coefficient == "Gender (Men vs. Women)" ~ "0.13",
+          coefficient == "Occupation (Non Farmer vs. Farmer)" ~ "0.07",
+          TRUE ~ "Unknown"
+        )) %>%
+        mutate(importance = as.numeric(importance))
+    
+      ggplot(plot_df_richness, aes(x = coefficient, y = Estimate, ymin = CI.min, ymax = CI.max)) +
+        geom_hline(yintercept=0, lty=2) +  # add a dotted line at x=0 after flip
+        geom_errorbar(aes(ymin = CI.min, ymax = CI.max), size = 2, width = 0.2) +
+        geom_point(aes(x = fct_rev(coefficient), color = importance), size = 8, alpha = 100) +
+        geom_point(shape = 1, size = 8, stroke = 1.5, color = "black") +
+        scale_color_gradient(name = "Importance\n(AICc Weight)", low = "lightblue", high = "darkblue", limits = c(0, 1)) +
+        coord_flip() +  # flip coordinates (puts labels on y axis)
+        xlab("") + ylab("Coefficient (95% Confidence Interval)") + 
+        scale_x_discrete(limits = c("Role Category (Most Popular vs. Periphery)", "Role Category (Core vs. Periphery)",
+                                    "Village (B vs. C)", "Household Lifestyle Index", "Household Size",
+                                    "Occupation (Non Farmer vs. Farmer)", "Education (Higher vs. None)",
+                                    "Education (Secondary vs. None)", "Education (Primary vs. None)",
+                                    "Gender (Men vs. Women)", "Age")) +
+        theme_classic() +
+        theme(axis.text.y = element_text(size = 30, color = "black"),
+              axis.text.x = element_text(size = 30, color = "black"),
+              axis.title.y = element_text(size = 30),
+              axis.title.x = element_text(size = 30),
+              plot.title = element_text(hjust = 0.5),
+              legend.title = element_text(size = 25),
+              legend.text = element_text(size = 20),
+              legend.key.size = unit(1.5, "cm"))
 
