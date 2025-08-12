@@ -48,6 +48,27 @@
     return(networks)
   }
   
+# Calculate Centrality Measures for Each Village's Network
+  calculate_centrality <- function(network) {
+    # Create distance weights for betweenness and closeness (invert the strength weights)
+    # Using 1/weight transformation since weights range from 1-5
+      E(network)$weight_distance <- 1 / E(network)$weight
+    
+    data.frame(
+      social_netid = V(network)$name,
+      weighted_degree = strength(network, mode = "total", weights = E(network)$weight),  # Weighted degree
+      betweenness = betweenness(network, 
+                                directed = TRUE, 
+                                weights = E(network)$weight_distance),  # Uses inverted weights
+      eigenvector = eigen_centrality(network, 
+                                     directed = TRUE, 
+                                     weights = E(network)$weight)$vector,  # Uses original weights
+      closeness = closeness(network, 
+                            mode = "total", 
+                            weights = E(network)$weight_distance)  # Uses inverted weights
+    )
+  }
+  
 # Compute Network Density and Summarize Centrality Measures
   network_summary_metrics <- function(network) {
     
@@ -552,6 +573,26 @@
       sd(strength(sarahandrano_net))
       mean(strength(andatsakala_net))
       sd(strength(andatsakala_net))
+      
+######################################
+#   CALCULATE CENTRALITY MEASURES    #
+######################################
+
+# Get Centrality Measures for Each Village
+  centrality_mandena <- calculate_centrality(mandena_net)
+  centrality_sarahandrano <- calculate_centrality(sarahandrano_net)
+  centrality_andatsakala <- calculate_centrality(andatsakala_net)
+
+# Combine All Centrality Measures
+  centrality_all <- bind_rows(
+    centrality_mandena,
+    centrality_sarahandrano,
+    centrality_andatsakala
+  )
+
+# Join Centrality Measures with Demographic Data
+  demo_df <- demo_df %>%
+    left_join(centrality_all, by = "social_netid")
 
 #######################################
 #   REFORMAT DATA FOR ROLE ANALYSIS   #
@@ -596,42 +637,42 @@
 #   ROLE ANALYSIS  #
 ####################
 
-# Initialize List to Store Output for Each Village
-  role_analysis_list <- vector("list", length(netwrite_list))
-  names(role_analysis_list) <- names(netwrite_list)
-
-# Iterate Role Analysis Function Over Netwrite Object for Each Village
-    for (i in seq_along(netwrite_list)) {
-      village <- netwrite_list[[i]]
-
-    # Execute Role Analysis Function
-      output <- role_analysis(graph = village$igraph_list,
-                              nodes = village$node_measures,
-                              directed = TRUE,
-                              method = "cluster",
-                              fast_triad = TRUE,
-                              min_partitions = 6,
-                              max_partitions = 20,
-                              min_partition_size = 5,
-                              viz = TRUE,
-                              retain_variables = TRUE,
-                              cluster_summaries = TRUE)
-
-    # Add Role Analysis Output to the list
-      role_analysis_list[[i]] <- list(
-        cluster_assignments = output$cluster_assignments,
-        cluster_dendrogram = output$cluster_dendrogram,
-        cluster_modularity = output$cluster_modularity,
-        cluster_relations_heatmaps = output$cluster_relations_heatmaps,
-        cluster_relations_sociogram = output$cluster_relations_sociogram,
-        cluster_sociogram = output$cluster_sociogram,
-        cluster_summaries = output$cluster_summaries,
-        cluster_summaries_cent = output$cluster_summaries_cent,
-        cluster_summaries_correlations = output$cluster_summaries_correlations,
-        cluster_summaries_triad = output$cluster_summaries_triad,
-        clustering_variables = output$clustering_variables
-    )
-    }
+# # Initialize List to Store Output for Each Village
+#   role_analysis_list <- vector("list", length(netwrite_list))
+#   names(role_analysis_list) <- names(netwrite_list)
+# 
+# # Iterate Role Analysis Function Over Netwrite Object for Each Village
+#     for (i in seq_along(netwrite_list)) {
+#       village <- netwrite_list[[i]]
+# 
+#     # Execute Role Analysis Function
+#       output <- role_analysis(graph = village$igraph_list,
+#                               nodes = village$node_measures,
+#                               directed = TRUE,
+#                               method = "cluster",
+#                               fast_triad = TRUE,
+#                               min_partitions = 6,
+#                               max_partitions = 20,
+#                               min_partition_size = 5,
+#                               viz = TRUE,
+#                               retain_variables = TRUE,
+#                               cluster_summaries = TRUE)
+# 
+#     # Add Role Analysis Output to the list
+#       role_analysis_list[[i]] <- list(
+#         cluster_assignments = output$cluster_assignments,
+#         cluster_dendrogram = output$cluster_dendrogram,
+#         cluster_modularity = output$cluster_modularity,
+#         cluster_relations_heatmaps = output$cluster_relations_heatmaps,
+#         cluster_relations_sociogram = output$cluster_relations_sociogram,
+#         cluster_sociogram = output$cluster_sociogram,
+#         cluster_summaries = output$cluster_summaries,
+#         cluster_summaries_cent = output$cluster_summaries_cent,
+#         cluster_summaries_correlations = output$cluster_summaries_correlations,
+#         cluster_summaries_triad = output$cluster_summaries_triad,
+#         clustering_variables = output$clustering_variables
+#     )
+#     }
 
 # Save Output
 # saveRDS(role_analysis_list, "role_output.rds")
@@ -953,23 +994,30 @@
       mutate(school_level = factor(school_level, levels = c("None", "Primary", "Secondary", "Higher")))
     model_df_2 <- demo_df %>%
       select(social_netid, village, age, gender, school_level, main_activity,
-      house_sol, goods_owned, household_size, group, species_richness)
+      house_sol, goods_owned, household_size, weighted_degree, betweenness, eigenvector, closeness, group, species_richness)
     model_df_2 = na.omit(model_df_2)
   
   # Standardize Continuous Predictor Variables
     model_df_2 <- model_df_2 %>%  
         mutate(age = datawizard::standardize(age)) %>%
         mutate(goods_owned = datawizard::standardize(goods_owned)) %>%
-        mutate(household_size = datawizard::standardize(household_size))
-  
+        mutate(household_size = datawizard::standardize(household_size)) %>%
+        mutate(weighted_degree = datawizard::standardize(weighted_degree)) %>%
+        mutate(betweenness = datawizard::standardize(betweenness)) %>%
+        mutate(eigenvector = datawizard::standardize(eigenvector)) %>%
+        mutate(closeness = datawizard::standardize(closeness))
+      
   # Specify Global Model
-    m_viruses <- glm(species_richness ~ age + gender + school_level + main_activity + 
-                     house_sol + goods_owned + household_size + village + group,
-               data = model_df_2,
-               family = "poisson",
-               na.action = na.fail)
+    m_viruses <- glmmTMB(species_richness ~ age + gender + school_level + main_activity + 
+                           house_sol + goods_owned + household_size + village +
+                           weighted_degree + betweenness + eigenvector + closeness + group,
+                         data = model_df_2,
+                         family = poisson,
+                         ziformula = ~1,
+                         na.action = na.fail)
     summary(m_viruses)
     performance::check_model(m_viruses)
+    DHARMa::testZeroInflation(m_viruses)
   
   # Use Dredge for Model Comparison
     m_viruses_dredge <- dredge(m_viruses)
@@ -978,6 +1026,7 @@
     m_viruses_avg <- model.avg(m_viruses_dredge, subset = delta < 2)
     summary(m_viruses_avg)
     plot(m_viruses_avg, intercept = FALSE)
+    sw(m_viruses_avg)
     
   # Plot Model Averaging Results # note -- add color gradiant for importance
   # Create Dataframe for Plotting
@@ -991,47 +1040,53 @@
     plot_df_richness <- plot_df_richness %>%
       filter(coefficient != "(Intercept)") %>%
       mutate(coefficient = recode(coefficient,
-                                  "age" = "Age",
-                                  "genderMale" = "Gender (Men vs. Women)",
-                                  "school_levelPrimary" = "Education (Primary vs. None)",
-                                  "school_levelSecondary" = "Education (Secondary vs. None)",
-                                  "school_levelHigher" = "Education (Higher vs. None)",
-                                  "main_activitynon-farmer" = "Occupation (Non Farmer vs. Farmer)",
-                                  "household_size" = "Household Size",
-                                  "house_sol" = "Household Lifestyle Index",
-                                  "villageSarahandrano" = "Village (B vs. C)",
-                                  "groupCore" = "Role Category (Core vs. Periphery)",
-                                  "groupMostPopular" = "Role Category (Most Popular vs. Periphery)"))
+                                  "cond(age)" = "Age",
+                                  "cond(genderMale)" = "Gender (Men vs. Women)",
+                                  "cond(school_levelPrimary)" = "Education (Primary vs. None)",
+                                  "cond(school_levelSecondary)" = "Education (Secondary vs. None)",
+                                  "cond(school_levelHigher)" = "Education (Higher vs. None)",
+                                  "cond(house_sol)" = "Household Lifestyle Index",
+                                  "cond(goods_owned)" = "Durable Goods Owned",
+                                  "cond(villageSarahandrano)" = "Village (B vs. C)",
+                                  "cond(weighted_degree)" = "Strength Centrality",
+                                  "cond(eigenvector)" = "Eigenvector Centrality",
+                                  "cond(closeness)" = "Closeness Centrality",
+                                  "cond(groupCore)" = "Role Category (Core vs. Periphery)",
+                                  "cond(groupMostPopular)" = "Role Category (Most Popular vs. Periphery)"))
   
     # Add Variable Importance to Plot Dataframe
       plot_df_richness <- plot_df_richness %>%
         mutate(importance = case_when(
           coefficient == "Role Category (Core vs. Periphery)" ~ "1",
           coefficient == "Role Category (Most Popular vs. Periphery)" ~ "1",
+          coefficient == "Strength Centrality" ~ "0.15",
+          coefficient == "Eigenvector Centrality" ~ "0.64",
+          coefficient == "Closeness Centrality" ~ "0.07",
           coefficient == "Education (Primary vs. None)" ~ "1",
           coefficient == "Education (Secondary vs. None)" ~ "1",
           coefficient == "Education (Higher vs. None)" ~ "1",
           coefficient == "Village (B vs. C)" ~ "1",
-          coefficient == "Age" ~ "0.42",
-          coefficient == "Household Size" ~ "0.32",
-          coefficient == "Household Lifestyle Index" ~ "0.22",
-          coefficient == "Gender (Men vs. Women)" ~ "0.13",
-          coefficient == "Occupation (Non Farmer vs. Farmer)" ~ "0.07",
+          coefficient == "Age" ~ "0.17",
+          coefficient == "Household Lifestyle Index" ~ "0.19",
+          coefficient == "Durable Goods Owned" ~ "0.07",
+          coefficient == "Gender (Men vs. Women)" ~ "0.08",
           TRUE ~ "Unknown"
         )) %>%
         mutate(importance = as.numeric(importance))
     
-      ggplot(plot_df_richness, aes(x = coefficient, y = Estimate, ymin = CI.min, ymax = CI.max)) +
+      coef_plot <- ggplot(plot_df_richness, aes(x = coefficient, y = Estimate, ymin = CI.min, ymax = CI.max)) +
         geom_hline(yintercept=0, lty=2) +  # add a dotted line at x=0 after flip
         geom_errorbar(aes(ymin = CI.min, ymax = CI.max), size = 2, width = 0.2) +
         geom_point(aes(x = fct_rev(coefficient), color = importance), size = 8, alpha = 100) +
         geom_point(shape = 1, size = 8, stroke = 1.5, color = "black") +
-        scale_color_gradient(name = "Importance\n(AICc Weight)", low = "lightblue", high = "darkblue", limits = c(0, 1)) +
+        scale_color_gradient(name = "Importance\n(AICc Weight)", low = "lightblue", high = "darkblue", limits = c(0, 1),
+                             guide = guide_colorbar(title.vjust = 3)) +
         coord_flip() +  # flip coordinates (puts labels on y axis)
         xlab("") + ylab("Coefficient (95% Confidence Interval)") + 
         scale_x_discrete(limits = c("Role Category (Most Popular vs. Periphery)", "Role Category (Core vs. Periphery)",
-                                    "Village (B vs. C)", "Household Lifestyle Index", "Household Size",
-                                    "Occupation (Non Farmer vs. Farmer)", "Education (Higher vs. None)",
+                                    "Closeness Centrality", "Eigenvector Centrality", "Strength Centrality",
+                                    "Village (B vs. C)", "Household Lifestyle Index", "Durable Goods Owned",
+                                    "Education (Higher vs. None)",
                                     "Education (Secondary vs. None)", "Education (Primary vs. None)",
                                     "Gender (Men vs. Women)", "Age")) +
         theme_classic() +
@@ -1042,5 +1097,15 @@
               plot.title = element_text(hjust = 0.5),
               legend.title = element_text(size = 25),
               legend.text = element_text(size = 20),
-              legend.key.size = unit(1.5, "cm"))
+              legend.key.size = unit(1.5, "cm"),
+              legend.position = "right",
+              legend.box = "vertical",
+              legend.box.just = "left")
 
+      ggsave("coefficient_plot.png",
+             plot = coef_plot,
+             width = 20,
+             height = 15,
+             dpi = 600,
+             bg = "white")
+      
