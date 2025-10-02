@@ -16,6 +16,7 @@
   library(patchwork)
   library(ideanet)
   library(brms)
+  library(glmmTMB)
   library(MuMIn)
 
 # set File Path
@@ -307,7 +308,7 @@
 ###############################
 
 # Read in Demographic Data
-  demo_df <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/Survey_Demographic_Health.csv"))
+  demo_df <- read_csv(paste0(fp, "/EEID_Data_public/clean_data_tables/NIH Human Surveys/Survey_Demographic_Health.csv"))
   
 # Create Household Style of Life Index
   # Wall Construction
@@ -829,40 +830,44 @@
   
   # Plot Species Prevalence by Role  
     # Both Villages Combined
-      exposure_summary_all_villages_df <- demo_df %>%
-        select(group, social_netid, c(13:348)) %>% 
-        pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
-        complete(group, virus, fill = list(positive = 0)) %>%
-        group_by(group, virus) %>%
-        summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
-        left_join(
-          demo_df %>%
-            select(group, social_netid) %>%
-            distinct() %>%
-            group_by(group) %>%
-            summarise(sample_size = n_distinct(social_netid)), 
-          by = "group"
-        ) %>%
-        mutate(percentage = (count / sample_size) * 100) %>%
-        group_by(virus) %>%
-        filter(sum(percentage > 0) > 0) %>% 
-        arrange(group, virus)
+    exposure_summary_all_villages_df <- demo_df %>%
+      select(group, social_netid, 13:348, -cluster_assignment) %>% 
+      mutate(across(-c(group, social_netid), as.numeric)) %>%  # Convert all except group and social_netid
+      pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
+      complete(group, virus, fill = list(positive = 0)) %>%
+      group_by(group, virus) %>%
+      summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
+      left_join(
+        demo_df %>%
+          select(group, social_netid) %>%
+          distinct() %>%
+          group_by(group) %>%
+          summarise(sample_size = n_distinct(social_netid)), 
+        by = "group"
+      ) %>%
+      mutate(percentage = (count / sample_size) * 100) %>%
+      group_by(virus) %>%
+      filter(sum(percentage > 0) > 0) %>% 
+      arrange(group, virus)
   
     # Count Total Viruses with ≥ 1 Positive Individual
       length(unique(exposure_summary_all_villages_df$virus))
       
-      ggplot(exposure_summary_all_villages_df, aes(x = group, y = virus, fill = percentage)) +
+      exposure_summary_all_villages <- ggplot(exposure_summary_all_villages_df, aes(x = group, y = virus, fill = percentage)) +
         geom_tile() +
         scale_fill_gradient(low = "white", high = "maroon") +
+        scale_x_discrete(labels = c("Periphery", "Core", "MostPopular" = "Popular")) +  # Add this line
         theme_minimal() +
         labs(x = "Role Category",
-             y = "Virus Species",
+             y = "Virus Species and Subtype",
              fill = "Seroprevalence (%)") +
-        theme(axis.text.x = element_text(hjust = 1),
-              axis.text = element_text(size = 18, color = "black"),
+        theme(axis.text = element_text(size = 18, color = "black"),
               axis.title = element_text(size = 18),
-              legend.title = element_text(size = 18),
+              legend.title = element_text(size = 18, margin = margin(b = 20)),
               legend.text = element_text(size = 18))
+      
+      ggsave("species_prevalence_heatmap.png", exposure_summary_all_villages, width = 20, height = 15, dpi = 300)
+      
       
       # Sarahandrano
         exposure_summary_sara_df <- demo_df %>%
@@ -955,39 +960,44 @@
       
     # Save Model Output
       # saveRDS(models, "/Users/tylerbarrett/Library/CloudStorage/OneDrive-DukeUniversity/Active Projects/Role Analysis/Data/bayes_model_output.rds")
+      models <- readRDS("C:/Users/tmbar/OneDrive - Duke University/Active Projects/Role Analysis/Data/bayes_model_output.rds")
       
     # Create Dataframe to Store Model Results
       results <- data.frame()
         
-    # Extract Posterior Samples
+      # Extract Posterior Samples and Convert to Odds Ratios
       posterior_data <- data.frame()
-        for (virus in names(models)) {
-          post_samples <- as_draws_df(models[[virus]]) %>%
-            as.data.frame() %>%
-            select(contains("b_group")) %>%
-            pivot_longer(cols = everything(), names_to = "group", values_to = "estimate") %>%
-            mutate(virus = virus)
-          posterior_data <- bind_rows(posterior_data, post_samples)
-        }
-        
-    # Plot Posterior Distributions
-      ggplot(posterior_data, aes(x = estimate, y = virus, fill = group)) +
+      for (virus in names(models)) {
+        post_samples <- as_draws_df(models[[virus]]) %>%
+          as.data.frame() %>%
+          select(contains("b_group")) %>%
+          pivot_longer(cols = everything(), names_to = "group", values_to = "estimate") %>%
+          mutate(virus = virus,
+                 odds_ratio = exp(estimate))  # Convert log-odds to odds ratio
+        posterior_data <- bind_rows(posterior_data, post_samples)
+      }
+      
+      # Plot Posterior Distributions
+      ggplot(posterior_data, aes(x = odds_ratio, y = virus, fill = group)) +
         geom_density_ridges(alpha = 0.7, scale = 1) + 
-        geom_vline(xintercept = 0, linetype = "dashed", color = "black") + 
-        scale_x_continuous(limits = c(-3, 3), breaks = seq(-3, 3, by = 0.5)) + 
-        scale_fill_manual(name = "Role Categories", 
-                            values = c("b_groupCore" = "#ff7f0e", "b_groupMostPopular" = "#1f77b4"),
-                            labels = c("b_groupCore" = "Core", "b_groupMostPopular" = "Most Popular")) + 
-        labs(x = "Effect Size (Log-Odds)",
-               y = "Virus",
-               fill = "Role Categories") + 
+        geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+        scale_x_log10(limits = c(0.05, 25), 
+                      breaks = c(0.1, 0.25, 0.5, 1, 2, 5, 10, 20)) +
+        scale_fill_manual(name = "Role Categories (Ref: Periphery)", 
+                          values = c("b_groupCore" = "#ff7f0e", "b_groupMostPopular" = "#1f77b4"),
+                          labels = c("b_groupCore" = "Core", "b_groupMostPopular" = "Popular")) + 
+        labs(x = "Odds Ratio",
+             y = NULL,  # Add this to remove y-axis title
+             fill = "Role Categories") + 
         theme_bw() + 
         theme(legend.position = "top",
-                axis.text = element_text(size = 18, face = "bold", color = "black"), 
-                axis.title = element_text(size = 24, face = "bold"), 
-                legend.text = element_text(size = 24, face = "bold"), 
-                legend.title = element_text(size = 24, face = "bold"))
-
+              axis.text = element_text(size = 18, face = "bold", color = "black"), 
+              axis.title = element_text(size = 24, face = "bold"), 
+              legend.text = element_text(size = 24, face = "bold"), 
+              legend.title = element_text(size = 24, face = "bold"))
+      
+      # ggsave("posterior_odds_ratio_ridges.png", width = 15, height = 12, dpi = 300)
+      
 # Predictors of Species Richness
   # Prepare Data for Modeling    
     demo_df <- demo_df %>%
@@ -1028,8 +1038,8 @@
     plot(m_viruses_avg, intercept = FALSE)
     sw(m_viruses_avg)
     
-  # Plot Model Averaging Results # note -- add color gradiant for importance
-  # Create Dataframe for Plotting
+    # Plot Model Averaging Results # note -- add color gradiant for importance
+    # Create Dataframe for Plotting
     m_viruses_summary <- summary(m_viruses_avg)
     plot_df_richness <- as.data.frame(m_viruses_summary$coefmat.full)
     plot_df_richness <- plot_df_richness %>%
@@ -1041,71 +1051,71 @@
       filter(coefficient != "(Intercept)") %>%
       mutate(coefficient = recode(coefficient,
                                   "cond(age)" = "Age",
-                                  "cond(genderMale)" = "Gender (Men vs. Women)",
-                                  "cond(school_levelPrimary)" = "Education (Primary vs. None)",
-                                  "cond(school_levelSecondary)" = "Education (Secondary vs. None)",
-                                  "cond(school_levelHigher)" = "Education (Higher vs. None)",
+                                  "cond(genderMale)" = "Gender: Men (Ref: Women)",
+                                  "cond(school_levelPrimary)" = "Education: Primary (Ref: None)",
+                                  "cond(school_levelSecondary)" = "Education: Secondary (Ref: None)",
+                                  "cond(school_levelHigher)" = "Education: Higher (Ref: None)",
                                   "cond(house_sol)" = "Household Lifestyle Index",
                                   "cond(goods_owned)" = "Durable Goods Owned",
-                                  "cond(villageSarahandrano)" = "Village (B vs. C)",
+                                  "cond(villageSarahandrano)" = "Village: B (Ref: C)",
                                   "cond(weighted_degree)" = "Strength Centrality",
                                   "cond(eigenvector)" = "Eigenvector Centrality",
                                   "cond(closeness)" = "Closeness Centrality",
-                                  "cond(groupCore)" = "Role Category (Core vs. Periphery)",
-                                  "cond(groupMostPopular)" = "Role Category (Most Popular vs. Periphery)"))
-  
-    # Add Variable Importance to Plot Dataframe
-      plot_df_richness <- plot_df_richness %>%
-        mutate(importance = case_when(
-          coefficient == "Role Category (Core vs. Periphery)" ~ "1",
-          coefficient == "Role Category (Most Popular vs. Periphery)" ~ "1",
-          coefficient == "Strength Centrality" ~ "0.15",
-          coefficient == "Eigenvector Centrality" ~ "0.64",
-          coefficient == "Closeness Centrality" ~ "0.07",
-          coefficient == "Education (Primary vs. None)" ~ "1",
-          coefficient == "Education (Secondary vs. None)" ~ "1",
-          coefficient == "Education (Higher vs. None)" ~ "1",
-          coefficient == "Village (B vs. C)" ~ "1",
-          coefficient == "Age" ~ "0.17",
-          coefficient == "Household Lifestyle Index" ~ "0.19",
-          coefficient == "Durable Goods Owned" ~ "0.07",
-          coefficient == "Gender (Men vs. Women)" ~ "0.08",
-          TRUE ~ "Unknown"
-        )) %>%
-        mutate(importance = as.numeric(importance))
+                                  "cond(groupCore)" = "Role: Core (Ref: Periphery)",
+                                  "cond(groupMostPopular)" = "Role: Popular (Ref: Periphery)"))
     
-      coef_plot <- ggplot(plot_df_richness, aes(x = coefficient, y = Estimate, ymin = CI.min, ymax = CI.max)) +
-        geom_hline(yintercept=0, lty=2) +  # add a dotted line at x=0 after flip
-        geom_errorbar(aes(ymin = CI.min, ymax = CI.max), size = 2, width = 0.2) +
-        geom_point(aes(x = fct_rev(coefficient), color = importance), size = 8, alpha = 100) +
-        geom_point(shape = 1, size = 8, stroke = 1.5, color = "black") +
-        scale_color_gradient(name = "Importance\n(AICc Weight)", low = "lightblue", high = "darkblue", limits = c(0, 1),
-                             guide = guide_colorbar(title.vjust = 3)) +
-        coord_flip() +  # flip coordinates (puts labels on y axis)
-        xlab("") + ylab("Coefficient (95% Confidence Interval)") + 
-        scale_x_discrete(limits = c("Role Category (Most Popular vs. Periphery)", "Role Category (Core vs. Periphery)",
-                                    "Closeness Centrality", "Eigenvector Centrality", "Strength Centrality",
-                                    "Village (B vs. C)", "Household Lifestyle Index", "Durable Goods Owned",
-                                    "Education (Higher vs. None)",
-                                    "Education (Secondary vs. None)", "Education (Primary vs. None)",
-                                    "Gender (Men vs. Women)", "Age")) +
-        theme_classic() +
-        theme(axis.text.y = element_text(size = 30, color = "black"),
-              axis.text.x = element_text(size = 30, color = "black"),
-              axis.title.y = element_text(size = 30),
-              axis.title.x = element_text(size = 30),
-              plot.title = element_text(hjust = 0.5),
-              legend.title = element_text(size = 25),
-              legend.text = element_text(size = 20),
-              legend.key.size = unit(1.5, "cm"),
-              legend.position = "right",
-              legend.box = "vertical",
-              legend.box.just = "left")
-
-      ggsave("coefficient_plot.png",
-             plot = coef_plot,
-             width = 20,
-             height = 15,
-             dpi = 600,
-             bg = "white")
+    # Add Variable Importance to Plot Dataframe
+    plot_df_richness <- plot_df_richness %>%
+      mutate(importance = case_when(
+        coefficient == "Role: Core (Ref: Periphery)" ~ "1",
+        coefficient == "Role: Popular (Ref: Periphery)" ~ "1",
+        coefficient == "Strength Centrality" ~ "0.15",
+        coefficient == "Eigenvector Centrality" ~ "0.64",
+        coefficient == "Closeness Centrality" ~ "0.07",
+        coefficient == "Education: Primary (Ref: None)" ~ "1",
+        coefficient == "Education: Secondary (Ref: None)" ~ "1",
+        coefficient == "Education: Higher (Ref: None)" ~ "1",
+        coefficient == "Village: B (Ref: C)" ~ "1",
+        coefficient == "Age" ~ "0.17",
+        coefficient == "Household Lifestyle Index" ~ "0.19",
+        coefficient == "Durable Goods Owned" ~ "0.07",
+        coefficient == "Gender: Men (Ref: Women)" ~ "0.08",
+        TRUE ~ "Unknown"
+      )) %>%
+      mutate(importance = as.numeric(importance))
+    
+    coef_plot <- ggplot(plot_df_richness, aes(x = coefficient, y = Estimate, ymin = CI.min, ymax = CI.max)) +
+      geom_hline(yintercept=0, lty=2) +  # add a dotted line at x=0 after flip
+      geom_errorbar(aes(ymin = CI.min, ymax = CI.max), size = 2, width = 0.2) +
+      geom_point(aes(x = fct_rev(coefficient), color = importance), size = 8, alpha = 100) +
+      geom_point(shape = 1, size = 8, stroke = 1.5, color = "black") +
+      scale_color_gradient(name = "Importance\n(AICc Weight)", low = "lightblue", high = "darkblue", limits = c(0, 1),
+                           guide = guide_colorbar(title.vjust = 3)) +
+      coord_flip() +  # flip coordinates (puts labels on y axis)
+      xlab("") + ylab("Coefficient (95% Confidence Interval)") + 
+      scale_x_discrete(limits = c("Role: Popular (Ref: Periphery)", "Role: Core (Ref: Periphery)",
+                                  "Closeness Centrality", "Eigenvector Centrality", "Strength Centrality",
+                                  "Village: B (Ref: C)", "Household Lifestyle Index", "Durable Goods Owned",
+                                  "Education: Higher (Ref: None)",
+                                  "Education: Secondary (Ref: None)", "Education: Primary (Ref: None)",
+                                  "Gender: Men (Ref: Women)", "Age")) +
+      theme_classic() +
+      theme(axis.text.y = element_text(size = 30, color = "black"),
+            axis.text.x = element_text(size = 30, color = "black"),
+            axis.title.y = element_text(size = 30),
+            axis.title.x = element_text(size = 30),
+            plot.title = element_text(hjust = 0.5),
+            legend.title = element_text(size = 25),
+            legend.text = element_text(size = 20),
+            legend.key.size = unit(1.5, "cm"),
+            legend.position = "right",
+            legend.box = "vertical",
+            legend.box.just = "left")
+ 
+#       ggsave("coefficient_plot.png",
+#              plot = coef_plot,
+#              width = 20,
+#              height = 15,
+#              dpi = 600,
+#              bg = "white")
       
