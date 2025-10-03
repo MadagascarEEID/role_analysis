@@ -861,12 +861,12 @@
         labs(x = "Role Category",
              y = "Virus Species and Subtype",
              fill = "Seroprevalence (%)") +
-        theme(axis.text = element_text(size = 18, color = "black"),
-              axis.title = element_text(size = 18),
-              legend.title = element_text(size = 18, margin = margin(b = 20)),
-              legend.text = element_text(size = 18))
+        theme(axis.text = element_text(size = 24, color = "black"),
+              axis.title = element_text(size = 30),
+              legend.title = element_text(size = 30, margin = margin(b = 20)),
+              legend.text = element_text(size = 22))
       
-      ggsave("species_prevalence_heatmap.png", exposure_summary_all_villages, width = 20, height = 15, dpi = 300)
+      ggsave("species_prevalence_heatmap.png", exposure_summary_all_villages, width = 20, height = 20, dpi = 300)
       
       
       # Sarahandrano

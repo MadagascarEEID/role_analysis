@@ -17,8 +17,8 @@
 
 # Set Global Font and Text Size
   font_family <- if (Sys.info()[["sysname"]] == "Windows") "sans" else "Helvetica"
-  base_pt     <- 24
-  legend_pt   <- 24
+  base_pt     <- 35
+  legend_pt   <- 35
   txt_mm      <- base_pt / .pt
   legend_txt_mm <- legend_pt / .pt
   
@@ -827,7 +827,7 @@
   print(final_plot)
 
 # Save Output
-# ggsave("final_figure.png", plot = final_plot,
-#        width = 30, height = 18, units = "in", dpi = 300, bg = "white")
+ggsave("role_summary.png", plot = final_plot,
+       width = 43, height = 20, units = "in", dpi = 300, bg = "white")
   
   
