@@ -831,25 +831,25 @@
   # Plot Species Prevalence by Role  
     # Both Villages Combined
     exposure_summary_all_villages_df <- demo_df %>%
-      select(group, social_netid, 13:348, -cluster_assignment) %>% 
-      mutate(across(-c(group, social_netid), as.numeric)) %>%  # Convert all except group and social_netid
-      pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
-      complete(group, virus, fill = list(positive = 0)) %>%
-      group_by(group, virus) %>%
+      select(village, group, social_netid, 13:348, -cluster_assignment) %>% 
+      mutate(across(-c(village, group, social_netid), as.numeric)) %>%
+      pivot_longer(cols = -c(village, group, social_netid), names_to = "virus", values_to = "positive") %>%
+      complete(village, group, virus, fill = list(positive = 0)) %>%
+      group_by(village, group, virus) %>%
       summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
       left_join(
         demo_df %>%
-          select(group, social_netid) %>%
+          select(village, group, social_netid) %>%
           distinct() %>%
-          group_by(group) %>%
-          summarise(sample_size = n_distinct(social_netid)), 
-        by = "group"
+          group_by(village, group) %>%
+          summarise(sample_size = n_distinct(social_netid), .groups = "drop"), 
+        by = c("village", "group")
       ) %>%
       mutate(percentage = (count / sample_size) * 100) %>%
       group_by(virus) %>%
       filter(sum(percentage > 0) > 0) %>% 
-      arrange(group, virus)
-  
+      arrange(village, group, virus)
+    
     # Count Total Viruses with ≥ 1 Positive Individual
       length(unique(exposure_summary_all_villages_df$virus))
       
@@ -866,68 +866,39 @@
               legend.title = element_text(size = 30, margin = margin(b = 20)),
               legend.text = element_text(size = 22))
       
-      ggsave("species_prevalence_heatmap.png", exposure_summary_all_villages, width = 20, height = 20, dpi = 300)
+      # ggsave("species_prevalence_heatmap.png", exposure_summary_all_villages, width = 20, height = 20, dpi = 300)
       
+    # Sarahandrano
+      exposure_summary_sara_df <- exposure_summary_all_villages_df %>%
+        filter(village == "Sarahandrano")
       
-      # Sarahandrano
-        exposure_summary_sara_df <- demo_df %>%
-          filter(village == "Sarahandrano") %>%
-          select(group, social_netid, c(9:343)) %>% 
-          pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
-          complete(group, virus, fill = list(positive = 0)) %>%
-          group_by(group, virus) %>%
-          summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
-          left_join(
-            demo_df %>%
-              select(group, social_netid) %>%
-              distinct() %>%
-              group_by(group) %>%
-              summarise(sample_size = n_distinct(social_netid)), 
-            by = "group"
-          ) %>%
-          mutate(percentage = (count / sample_size) * 100) %>%
-          group_by(virus) %>%
-          filter(sum(percentage > 0) > 0) %>% 
-          arrange(group, virus)
-        ggplot(exposure_summary_sara_df, aes(x = group, y = virus, fill = percentage)) +
-          geom_tile() +
-          scale_fill_gradient(low = "white", high = "maroon") +
-          theme_minimal() +
-          labs(title = "Viral Exposure by Role Type",
-               x = "Role Type",
-               y = "Virus Species",
-               fill = "Percent Exposed") +
-          theme(axis.text.x = element_text(hjust = 1))
-        
-      # Andatsakala  
-        exposure_summary_andat_df <- demo_df %>%
-          filter(village == "Andatsakala") %>%
-          select(group, social_netid, c(9:343)) %>% 
-          pivot_longer(cols = -c(group, social_netid), names_to = "virus", values_to = "positive") %>%
-          complete(group, virus, fill = list(positive = 0)) %>%
-          group_by(group, virus) %>%
-          summarise(count = sum(positive == 1, na.rm = TRUE), .groups = "drop") %>%
-          left_join(
-            demo_df %>%
-              select(group, social_netid) %>%
-              distinct() %>%
-              group_by(group) %>%
-              summarise(sample_size = n_distinct(social_netid)), 
-            by = "group"
-          ) %>%
-          mutate(percentage = (count / sample_size) * 100) %>%
-          group_by(virus) %>%
-          filter(sum(percentage > 0) > 0) %>% 
-          arrange(group, virus)
-        ggplot(exposure_summary_andat_df, aes(x = group, y = virus, fill = percentage)) +
-          geom_tile() +
-          scale_fill_gradient(low = "white", high = "maroon") +
-          theme_minimal() +
-          labs(title = "Viral Exposure by Role Type",
-               x = "Role Type",
-               y = "Virus Species",
-               fill = "Percent Exposed") +
-          theme(axis.text.x = element_text(hjust = 1))
+      ggplot(exposure_summary_sara_df, aes(x = group, y = virus, fill = percentage)) +
+        geom_tile() +
+        scale_fill_gradient(low = "white", high = "maroon") +
+        theme_minimal() +
+        labs(
+          title = "Viral Exposure by Role Type — Sarahandrano",
+          x = "Role Type",
+          y = "Virus Species",
+          fill = "Percent Exposed"
+        ) +
+        theme(axis.text.x = element_text(hjust = 1))
+      
+    # Andatsakala
+      exposure_summary_andat_df <- exposure_summary_all_villages_df %>%
+        filter(village == "Andatsakala")
+      
+      ggplot(exposure_summary_andat_df, aes(x = group, y = virus, fill = percentage)) +
+        geom_tile() +
+        scale_fill_gradient(low = "white", high = "maroon") +
+        theme_minimal() +
+        labs(
+          title = "Viral Exposure by Role Type — Andatsakala",
+          x = "Role Type",
+          y = "Virus Species",
+          fill = "Percent Exposed"
+        ) +
+        theme(axis.text.x = element_text(hjust = 1))
   
 # Compare Differences in Prevalence for Each Virus Across Role Categories
   # Bivariate Bayesian Logistic Regression Models
