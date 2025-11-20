@@ -1,8 +1,9 @@
-# Atlas of 36 Triad Positions
+# Typology of 36 Triad Positions
 # Created by Tyler Barrett on October 1, 2025
+# This code generates the triad typology figure. No data are required.
 
 #################
-#   Preamble    #
+#   PREAMBLE    #
 #################
 
 #	Load packages
@@ -10,47 +11,32 @@
   library(ggh4x)
   library(patchwork)
 
-# Functions
-  #	Extract Edge Indices from Adjacency Matrix
-    edge_index <- function(adj) {
-      #	"""
-      #	Args:
-      #		adj: 3x3 adjacency matrix (0/1)
-      #	Returns:
-      #		tibble with columns from, to for each edge (row, col where adj==1)
-      #	Notes:
-      #		Returns empty tibble if no edges present.
-      #	"""
-      
-      #	Find edge positions
+##################
+#   FUNCTIONS    #
+##################
+
+#	Extract Edge Indices from Adjacency Matrix
+  edge_index <- function(adj) {
+    
+    #	Find edge positions
       idx <- which(adj == 1, arr.ind = TRUE)
-      
-      #	Early return if no edges
+    
+    #	Early return if no edges
       if (length(idx) == 0) {
         return(tibble(from = integer(), to = integer()))
       }
-      
-      #	Convert to tibble
+    
+    #	Convert to tibble
       as_tibble(idx) %>% rename(from = row, to = col)
 }
-  
-  #	Derive Role Group from Focal Position
-    role_from_focal <- function(adj, focal) {
-      #	"""
-      #	Args:
-      #		adj: 3x3 adjacency matrix
-      #		focal: integer (1, 2, or 3) indicating focal node
-      #	Returns:
-      #		string label for role group
-      #	Notes:
-      #		Classifies focal node's role based on mutual, outgoing,
-      #		and incoming ties to other two nodes.
-      #	"""
-      
-      #	Identify other nodes
+
+#	Derive Role Group from Focal Position
+  role_from_focal <- function(adj, focal) {
+    
+    #	Identify other nodes
       others <- setdiff(1:3, focal)
-      
-      #	Classify relationships
+    
+    #	Classify relationships
       rel <- vapply(others, function(j) {
         a <- adj[focal, j]
         b <- adj[j, focal]
@@ -59,13 +45,13 @@
         else if (b == 1)      "in"
         else                  "none"
       }, character(1))
-      
-      #	Count tie types
+    
+    #	Count tie types
       m <- sum(rel == "mutual")
       o <- sum(rel == "out")
       i <- sum(rel == "in")
-      
-      #	Assign role based on counts
+    
+    #	Assign role based on counts
       if (m == 0 && o == 0 && i == 0) return("Isolate")
       if (m == 1 && o == 0 && i == 0) return("Reciprocal")
       if (m == 0 && o == 1 && i == 0) return("Unreciprocated out")
@@ -78,54 +64,35 @@
       if (o == 1 && i == 1)           return("In & out (bridge)")
       "Other"
 }
-  
-  #	Shorten Edges for Arrow Visibility
-    shorten_edges <- function(df, r = 0.22) {
-      #	"""
-      #	Args:
-      #		df: data frame with x_from, y_from, x_to, y_to columns
-      #		r: radius to shorten from each end (default 0.22)
-      #	Returns:
-      #		modified data frame with shortened edge coordinates
-      #	Notes:
-      #		Prevents arrows from overlapping node circles.
-      #	"""
-      
-      #	Calculate edge vectors
+
+#	Shorten Edges for Arrow Visibility
+  shorten_edges <- function(df, r = 0.22) {
+    
+    #	Calculate edge vectors
       dx  <- df$x_to - df$x_from
       dy  <- df$y_to - df$y_from
       len <- sqrt(dx^2 + dy^2)
       len[len == 0] <- 1e-9
-      
-      #	Shorten from both ends
+    
+    #	Shorten from both ends
       df$x_from <- df$x_from + r * dx / len
       df$y_from <- df$y_from + r * dy / len
       df$x_to   <- df$x_to   - r * dx / len
       df$y_to   <- df$y_to   - r * dy / len
-      
-      return(df)
+    
+    return(df)
 }
-  
-  #	Plot Triad Group
-    plot_group <- function(group_name, title) {
-      #	"""
-      #	Args:
-      #		group_name: string name of role group to plot
-      #		title: string title for the panel
-      #	Returns:
-      #		ggplot object with faceted triads
-      #	Notes:
-      #		Creates horizontal strip of all triads in specified role group.
-      #		Focal nodes colored red, others black.
-      #	"""
-      
-      #	Filter triads for this group
+
+#	Plot Triad Group
+  plot_group <- function(group_name, title) {
+    
+    #	Filter triads for this group
       triads <- nodes_df %>%
         filter(role_group == group_name) %>%
         pull(triad) %>%
         unique()
-      
-      #	Build plot
+    
+    #	Build plot
       ggplot() +
         geom_rect(
           data = panel_bg %>% filter(triad %in% triads),
@@ -149,24 +116,15 @@
         labs(title = title) +
         inner_theme
 }
-  
-  #	Wrap Plot for Patchwork
-    wrap_plot <- function(p) {
-      #	"""
-      #	Args:
-      #		p: ggplot object
-      #	Returns:
-      #		wrapped plot element for patchwork layout
-      #	Notes:
-      #		Ensures patchwork respects individual panel sizes.
-      #	"""
-      
-      wrap_elements(full = p) + plot_layout(widths = 1, heights = 1)
+
+#	Wrap Plot for Patchwork
+  wrap_plot <- function(p) {
+    wrap_elements(full = p) + plot_layout(widths = 1, heights = 1)
 }
 
-###############################
-#   Fixed Node Coordinates    #
-###############################
+##############################
+#   FIXED NODE COORDINATES   #
+##############################
 
 node_coords <- tibble(
   node = 1:3,
@@ -174,9 +132,9 @@ node_coords <- tibble(
   y    = c(0.7, -0.35, -0.35)
 )
 
-#####################################
-#   Canonical Adjacency Matrices    #
-#####################################
+###################################
+#   ADJACENCY MATRIX DEFINITIONS  #
+###################################
 
 #	Base triad structures
   A003  <- matrix(0, 3, 3)
@@ -206,9 +164,9 @@ node_coords <- tibble(
     "210"  = A210,  "300" = A300
   )
 
-#############################
-#   Triad Specifications    #
-#############################
+###########################
+#   TRIAD SPECIFICATIONS  #
+###########################
 
 #	Original triad-base-focal mapping
   triad_specs_original <- tribble(
@@ -284,7 +242,7 @@ node_coords <- tibble(
   }
 
 ########################################
-#   Edge and Node Data Construction    #
+#   EDGE AND NODE DATA CONSTRUCTION    #
 ########################################
 
 #	Build edge data frame with coordinates
@@ -315,32 +273,32 @@ node_coords <- tibble(
   panel_bg <- triad_specs %>%
     transmute(triad, xmin = -1.05, xmax = 1.05, ymin = -1.05, ymax = 1.05)
 
-##################################
-#   Role Group Classification    #
-##################################
+############################################
+#   TRIAD POSITION GROUP CLASSIFICATION    #
+############################################
 
-#	Compute role groups for all triads
+#	Compute groups for all triads
   role_map <- triad_specs %>%
     rowwise() %>%
     mutate(role_group = role_from_focal(base_mats[[base]], focal)) %>%
     ungroup() %>%
     select(triad, role_group)
 
-#	Attach role groups to data frames
+#	Attach groups to data frames
   nodes_df <- nodes_df %>% left_join(role_map, by = "triad")
   edges_df <- edges_df %>% left_join(role_map, by = "triad")
   panel_bg <- panel_bg %>% left_join(role_map, by = "triad")
 
-##########################################
-#   Edge Shortening for Arrow Display    #
-##########################################
+#########################################
+#   EDGE SHORTENING FOR ARROW DISPLAY   #
+#########################################
 
 #	Apply shortening
-edges_df_short <- shorten_edges(edges_df, r = 0.22)
+  edges_df_short <- shorten_edges(edges_df, r = 0.22)
 
-#######################
-#   Plotting Theme    #
-#######################
+########################
+#   PLOTTING THEMES    #
+########################
 
 #	Internal plot theme for triad panels
   inner_theme <- theme_void(base_size = 10.5) +
@@ -354,9 +312,9 @@ edges_df_short <- shorten_edges(edges_df, r = 0.22)
       plot.margin      = margin(1, 1, 1, 1)
     )
 
-#################################
-#   Generate Category Panels    #
-#################################
+################################
+#   GENERATE CATEGORY PANELS   #
+################################
 
 #	Create wrapped plots for each role group
   pA <- wrap_plot(plot_group("Isolate",                   "Isolate"))
@@ -371,7 +329,7 @@ edges_df_short <- shorten_edges(edges_df, r = 0.22)
   pJ <- wrap_plot(plot_group("Reciprocal + inward",       "Reciprocal and Unreciprocated In"))
 
 ########################
-#   Assemble Layout    #
+#   ASSEMBLE LAYOUT    #
 ########################
 
 #	Build rows
@@ -390,9 +348,9 @@ edges_df_short <- shorten_edges(edges_df, r = 0.22)
 #	Display
   triad_plot
 
-####################
-#   Save Output    #
-####################
+###################
+#   SAVE OUTPUT   #
+###################
 
 # ggsave("triad_plot.png", triad_plot, width = 10, height = 8, dpi = 300)
   

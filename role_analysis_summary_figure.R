@@ -4,7 +4,7 @@
 # a summary figure to describe the role structure at a high level.
 
 #################
-#   Preamble    #
+#   PREAMBLE    #
 #################
 
 # Load Packages
@@ -17,7 +17,7 @@
 
 # Set Global Font and Text Size
   font_family <- if (Sys.info()[["sysname"]] == "Windows") "sans" else "Helvetica"
-  base_pt     <- 35
+  base_pt     <- 50
   legend_pt   <- 35
   txt_mm      <- base_pt / .pt
   legend_txt_mm <- legend_pt / .pt
@@ -27,11 +27,13 @@
       theme(text = element_text(family = font_family, size = base_pt))
   )
 
-# Functions
-  # Create Summary Dataframe  
-    create_combined_summary_df <- function(clustering_variables, cluster_groups, village_name) {
-      
-      # Prepare data for triad positions
+##################
+#   FUNCTIONS    #
+##################
+  
+# Create Summary Dataframe  
+  create_combined_summary_df <- function(clustering_variables, cluster_groups, village_name) {
+    # Prepare data for triad positions
       triad_df <- clustering_variables %>%
         select(id, cluster, any_of(c("freetime_021C_B", "freetime_021C_S", "freetime_021D_E", "freetime_021D_S", 
                                      "freetime_021U_E", "freetime_021U_S", "freetime_030T_S", "freetime_111D_S", 
@@ -107,87 +109,76 @@
         select(village, group, relation, measure_type, measure, value)
       
       # Prepare data for centrality measures
-      cent_df <- clustering_variables %>%
-        select(id, cluster, any_of(c("freetime_total_degree", "freetime_in_degree", "freetime_out_degree", 
-                                     "food_help_received_total_degree", "food_help_received_in_degree", "food_help_received_out_degree", 
-                                     "food_help_provided_total_degree", "food_help_provided_in_degree", "food_help_provided_out_degree", 
-                                     "farm_help_received_total_degree", "farm_help_received_in_degree", "farm_help_received_out_degree", 
-                                     "farm_help_provided_total_degree", "farm_help_provided_in_degree", "farm_help_provided_out_degree", 
-                                     "betweenness_scores", "freetime_betweenness_scores", "food_help_received_betweenness_scores", 
-                                     "food_help_provided_betweenness_scores", "farm_help_received_betweenness_scores", "farm_help_provided_betweenness_scores", 
-                                     "bonpow", "bonpow_negative", "freetime_bonpow", "freetime_bonpow_negative", 
-                                     "food_help_received_bonpow", "food_help_received_bonpow_negative", "food_help_provided_bonpow", "food_help_provided_bonpow_negative", 
-                                     "farm_help_received_bonpow", "farm_help_received_bonpow_negative", "farm_help_provided_bonpow", "farm_help_provided_bonpow_negative", 
-                                     "eigen_centrality", "freetime_eigen_centrality", "food_help_received_eigen_centrality", 
-                                     "food_help_provided_eigen_centrality", "farm_help_received_eigen_centrality", "farm_help_provided_eigen_centrality", 
-                                     "closeness_in", "closeness_out", "closeness_undirected", 
-                                     "freetime_closeness_in", "freetime_closeness_out", "freetime_closeness_undirected", 
-                                     "food_help_received_closeness_in", "food_help_received_closeness_out", "food_help_received_closeness_undirected", 
-                                     "food_help_provided_closeness_in", "food_help_provided_closeness_out", "food_help_provided_closeness_undirected", 
-                                     "farm_help_received_closeness_in", "farm_help_received_closeness_out", "farm_help_received_closeness_undirected", 
-                                     "farm_help_provided_closeness_in", "farm_help_provided_closeness_out", "farm_help_provided_closeness_undirected")))
-      
-      cent_summary_df <- cent_df %>% 
-        mutate(group = factor(case_when(
-          cluster %in% cluster_groups$most_popular ~ "Most Popular",
-          cluster %in% cluster_groups$core ~ "Core",
-          cluster %in% cluster_groups$periphery ~ "Periphery"
-        ), levels = c("Most Popular", "Core", "Periphery"))) %>% 
-        group_by(group) %>% 
-        summarise(across(matches("^(freetime|food_help_provided|food_help_received|farm_help_provided|farm_help_received)_"), mean, na.rm = TRUE)) %>% 
-        ungroup() %>% 
-        mutate(across(where(is.numeric), ~ scale(.)[,1], .names = "std_{.col}")) %>% 
-        select(group, starts_with("std_")) %>% 
-        pivot_longer(cols = -group, names_to = "variable", values_to = "value") %>% 
-        mutate(
-          relation = case_when(
-            str_detect(variable, "^std_freetime") ~ "Free Time",
-            str_detect(variable, "^std_food_help_provided") ~ "Food Help Provided",
-            str_detect(variable, "^std_food_help_received") ~ "Food Help Received",
-            str_detect(variable, "^std_farm_help_provided") ~ "Farm Help Provided",
-            str_detect(variable, "^std_farm_help_received") ~ "Farm Help Received"
-          ),
-          centrality_measure = str_remove(variable, "^(std_freetime_|std_food_help_provided_|std_food_help_received_|std_farm_help_provided_|std_farm_help_received_)") %>%
-            str_replace_all("_", " ") %>% 
-            str_replace("betweenness scores", "Betweenness") %>%
-            str_to_title(),
-          measure_type = "Centrality",
-          measure = centrality_measure,
-          village = village_name
-        ) %>%
-        select(village, group, relation, measure_type, measure, value)
-      
+        cent_df <- clustering_variables %>%
+          select(id, cluster, any_of(c("freetime_total_degree", "freetime_in_degree", "freetime_out_degree", 
+                                       "food_help_received_total_degree", "food_help_received_in_degree", "food_help_received_out_degree", 
+                                       "food_help_provided_total_degree", "food_help_provided_in_degree", "food_help_provided_out_degree", 
+                                       "farm_help_received_total_degree", "farm_help_received_in_degree", "farm_help_received_out_degree", 
+                                       "farm_help_provided_total_degree", "farm_help_provided_in_degree", "farm_help_provided_out_degree", 
+                                       "betweenness_scores", "freetime_betweenness_scores", "food_help_received_betweenness_scores", 
+                                       "food_help_provided_betweenness_scores", "farm_help_received_betweenness_scores", "farm_help_provided_betweenness_scores", 
+                                       "bonpow", "bonpow_negative", "freetime_bonpow", "freetime_bonpow_negative", 
+                                       "food_help_received_bonpow", "food_help_received_bonpow_negative", "food_help_provided_bonpow", "food_help_provided_bonpow_negative", 
+                                       "farm_help_received_bonpow", "farm_help_received_bonpow_negative", "farm_help_provided_bonpow", "farm_help_provided_bonpow_negative", 
+                                       "eigen_centrality", "freetime_eigen_centrality", "food_help_received_eigen_centrality", 
+                                       "food_help_provided_eigen_centrality", "farm_help_received_eigen_centrality", "farm_help_provided_eigen_centrality", 
+                                       "closeness_in", "closeness_out", "closeness_undirected", 
+                                       "freetime_closeness_in", "freetime_closeness_out", "freetime_closeness_undirected", 
+                                       "food_help_received_closeness_in", "food_help_received_closeness_out", "food_help_received_closeness_undirected", 
+                                       "food_help_provided_closeness_in", "food_help_provided_closeness_out", "food_help_provided_closeness_undirected", 
+                                       "farm_help_received_closeness_in", "farm_help_received_closeness_out", "farm_help_received_closeness_undirected", 
+                                       "farm_help_provided_closeness_in", "farm_help_provided_closeness_out", "farm_help_provided_closeness_undirected")))
+        
+        cent_summary_df <- cent_df %>% 
+          mutate(group = factor(case_when(
+            cluster %in% cluster_groups$most_popular ~ "Most Popular",
+            cluster %in% cluster_groups$core ~ "Core",
+            cluster %in% cluster_groups$periphery ~ "Periphery"
+          ), levels = c("Most Popular", "Core", "Periphery"))) %>% 
+          group_by(group) %>% 
+          summarise(across(matches("^(freetime|food_help_provided|food_help_received|farm_help_provided|farm_help_received)_"), mean, na.rm = TRUE)) %>% 
+          ungroup() %>% 
+          mutate(across(where(is.numeric), ~ scale(.)[,1], .names = "std_{.col}")) %>% 
+          select(group, starts_with("std_")) %>% 
+          pivot_longer(cols = -group, names_to = "variable", values_to = "value") %>% 
+          mutate(
+            relation = case_when(
+              str_detect(variable, "^std_freetime") ~ "Free Time",
+              str_detect(variable, "^std_food_help_provided") ~ "Food Help Provided",
+              str_detect(variable, "^std_food_help_received") ~ "Food Help Received",
+              str_detect(variable, "^std_farm_help_provided") ~ "Farm Help Provided",
+              str_detect(variable, "^std_farm_help_received") ~ "Farm Help Received"
+            ),
+            centrality_measure = str_remove(variable, "^(std_freetime_|std_food_help_provided_|std_food_help_received_|std_farm_help_provided_|std_farm_help_received_)") %>%
+              str_replace_all("_", " ") %>% 
+              str_replace("betweenness scores", "Betweenness") %>%
+              str_to_title(),
+            measure_type = "Centrality",
+            measure = centrality_measure,
+            village = village_name
+          ) %>%
+          select(village, group, relation, measure_type, measure, value)
+        
       # Combine both dataframes
-      combined_df <- bind_rows(triad_summary_df, cent_summary_df)
+        combined_df <- bind_rows(triad_summary_df, cent_summary_df)
       
       return(combined_df)
   }
-    
-  #	Process Data
-    process_village_data <- function(village_name, data) {
-      #	"""
-      #	Args:
-      #		village_name: string name of village to filter
-      #		data: data frame containing village network measures
-      #	Returns:
-      #		list with triad and centrality tibbles
-      #	Notes:
-      #		Filters data by village, categorizes triads by pattern,
-      #		and aggregates both triad and centrality measures.
-      #	"""
-      
-      #	Filter village data
+  
+#	Process Data
+  process_village_data <- function(village_name, data) {
+    #	Filter village data
       village_data <- data %>% filter(village == village_name)
-      
-      #	Define triad categories
+    
+    #	Define triad categories
       reciprocal_triads <- c("201_B", "210_B", "300")
       sender_triads     <- c("012_S", "021C_S", "021U_S", "111D_S",
                              "021D_S", "030T_S", "120D_S")
       receiver_triads   <- c("012_E", "021C_E", "021D_E", "111U_E",
                              "021U_E", "030T_E", "120U_E")
       bridge_triads     <- c("021C_B", "030C", "030T_B", "120C_B")
-      
-      #	Process triad data
+    
+    #	Process triad data
       triad_data <- village_data %>%
         filter(measure_type == "Triad Position") %>%
         group_by(group, measure) %>%
@@ -195,140 +186,154 @@
         mutate(
           pattern = case_when(
             measure %in% reciprocal_triads ~ "Reciprocal",
-            measure %in% sender_triads     ~ "Unreciprocated\nOut",
-            measure %in% receiver_triads   ~ "Unreciprocated\nIn",
+            measure %in% sender_triads     ~ "Unreciprocated Out",
+            measure %in% receiver_triads   ~ "Unreciprocated In",
             measure %in% bridge_triads     ~ "Bridging",
             TRUE                           ~ "Other"
           )
-        )
-      
-      #	Process centrality data
-      centrality_data <- village_data %>%
-        filter(measure_type == "Centrality") %>%
-        group_by(group, measure) %>%
-        summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
-      
-      #	Assemble result
-      return(list(triad = triad_data, centrality = centrality_data))
-  }
+      )
     
-  # Utilities For Processing Matrices
-    #	Sanitize Square Matrix
-      sanitize_square <- function(m) {
-        #	"""
-        #	Args:
-        #		m: numeric matrix
-        #	Returns:
-        #		sanitized matrix with NA->0, negatives->0, diagonal->0
-        #	Notes:
-        #		Ensures adjacency matrix has valid values for graph construction.
-        #	"""
-        
-        #	Clean values
+    #	Process centrality data
+    centrality_data <- village_data %>%
+      filter(measure_type == "Centrality") %>%
+      group_by(group, measure) %>%
+      summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
+    
+    #	Assemble result
+    return(list(triad = triad_data, centrality = centrality_data))
+}
+  
+# Utilities For Processing Matrices
+  #	Sanitize Square Matrix
+    sanitize_square <- function(m) {
+      #	Clean values
         m[is.na(m)] <- 0
         m[m < 0]    <- 0
         diag(m)     <- 0
-        
-        return(m)
-  }
       
-    #	Create Edge List from Matrix
-      make_edges <- function(m, label) {
-        #	"""
-        #	Args:
-        #		m: adjacency matrix (row->col = directed edge)
-        #		label: string label for edge type
-        #	Returns:
-        #		tibble with columns: from, to, type
-        #	Notes:
-        #		Extracts all positive entries as directed edges.
-        #	"""
-        
-        #	Sanitize input
+      return(m)
+}
+    
+  #	Create Edge List from Matrix
+    make_edges <- function(m, label) {
+      
+      #	Sanitize input
         m <- sanitize_square(m)
-        
-        #	Extract edge indices
-        idx <- which(m > 0, arr.ind = TRUE)
-        
-        #	Early return if no edges
-        if (nrow(idx) == 0) {
-          return(tibble(from = integer(), to = integer(), type = character()))
-        }
-        
-        #	Build edge table
-        tibble(from = idx[, "row"], to = idx[, "col"], type = label)
-  }
       
-    #	Build Village Graph
-      build_village_graph <- function(fhp, fhr, fohp, fohr, ft, node_tbl) {
-        #	"""
-        #	Args:
-        #		fhp, fhr: farm helping matrices (planting, reaping)
-        #		fohp, fohr: food exchange matrices (planting, reaping)
-        #		ft: free time matrix
-        #		node_tbl: tibble with node attributes (id, n, group, shape)
-        #	Returns:
-        #		tbl_graph object with directed edges and sized nodes
-        #	Notes:
-        #		Averages paired matrices, combines edge types, adds size mapping.
-        #	"""
-        
-        #	Average paired matrices
+      #	Extract edge indices
+        idx <- which(m > 0, arr.ind = TRUE)
+      
+    #	Early return if no edges
+      if (nrow(idx) == 0) {
+        return(tibble(from = integer(), to = integer(), type = character()))
+      }
+      
+      #	Build edge table
+      tibble(from = idx[, "row"], to = idx[, "col"], type = label)
+}
+    
+  #	Build Village Graph
+    build_village_graph <- function(fhp, fhr, fohp, fohr, ft, node_tbl) {
+      
+      #	Average paired matrices
         food_avg <- sanitize_square((sanitize_square(fohp) + sanitize_square(fohr)) / 2)
         farm_avg <- sanitize_square((sanitize_square(fhp)  + sanitize_square(fhr))  / 2)
         ft       <- sanitize_square(ft)
-        
-        #	Create edge lists
+      
+      #	Create edge lists
         edges <- bind_rows(
           make_edges(food_avg, "Food Exchange"),
           make_edges(farm_avg, "Co-Farmworking"),
           make_edges(ft,       "Free Time")
         )
-        
-        #	Prepare node table
+      
+      #	Prepare node table
         nodes <- node_tbl %>%
           mutate(
             id = as.integer(id),
             size_mapped = .map_node_size(n)
           )
-        
-        #	Build graph
+      
+      #	Build graph
         tbl_graph(nodes = nodes, edges = edges, directed = TRUE)
+}
+  
+#	Normalize group labels
+  normalize_groups <- function(x) {
+    x_chr <- as.character(x)
+    ifelse(x_chr == "Popular", "Most Popular", x_chr)
+}
+  
+#	Normalize measure labels
+  normalize_measure <- function(x) {
+    x_chr <- trimws(as.character(x))
+    recode(x_chr,
+           "Closeness"     = "Closeness Out",
+           "ClosenessOut"  = "Closeness Out",
+           "Out Closeness" = "Closeness Out",
+           .default = x_chr)
   }
+  
+#	Plot Network with Algorithmic Layout
+  plot_network_algorithmic <- function(graph, title,
+                                       layout_algo   = "fr",
+                                       seed          = 42,
+                                       niter         = 1200,
+                                       fan_strength  = 0.75,
+                                       drop_isolates = TRUE,
+                                       cap_quantile  = 0.20,
+                                       cap_fudge     = 0.25) {
     
-  #	Normalize group labels
-    normalize_groups <- function(x) {
-      #	"""
-      #	Args:
-      #		x: character vector of group labels
-      #	Returns:
-      #		character vector with "Popular" -> "Most Popular"
-      #	"""
-      
-      x_chr <- as.character(x)
-      ifelse(x_chr == "Popular", "Most Popular", x_chr)
-  }
+  #	Filter isolates if requested
+    g <- graph
+    if (drop_isolates) {
+      g <- g %>% activate(nodes) %>% filter(!node_is_isolated())
+    }
     
-  #	Normalize measure labels
-    normalize_measure <- function(x) {
-      #	"""
-      #	Args:
-      #		x: character vector of measure names
-      #	Returns:
-      #		character vector with standardized closeness labels
-      #	"""
-      
-      x_chr <- trimws(as.character(x))
-      recode(x_chr,
-             "Closeness"     = "Closeness Out",
-             "ClosenessOut"  = "Closeness Out",
-             "Out Closeness" = "Closeness Out",
-             .default = x_chr)
+  #	Compute arrow cap distance
+    sizes <- g %>% activate(nodes) %>% as_tibble() %>% pull(size_mapped)
+    sizes <- sizes[is.finite(sizes)]
+    if (!length(sizes)) sizes <- 6
+    
+    diam_ref <- as.numeric(quantile(sizes, probs = cap_quantile, names = FALSE, type = 7))
+    cap_mm   <- (diam_ref / 2) + cap_fudge
+    cap_mm   <- max(cap_mm, 1.6)
+    start_mm <- max(cap_mm * 0.65, 1)
+    
+  #	Create plot
+    set.seed(seed)
+    ggraph(g, layout = layout_algo, niter = niter) +
+      geom_edge_fan(
+        aes(color = type),
+        show.legend = FALSE,
+        arrow      = arrow(length = unit(2.4, "mm"), type = "closed"),
+        start_cap  = ggraph::circle(start_mm, "mm"),
+        end_cap    = ggraph::circle(cap_mm,  "mm"),
+        lineend    = "round",
+        width      = 1.05,
+        alpha      = 0.70,
+        strength   = fan_strength
+      ) +
+      geom_node_point(
+        aes(shape = shape, size = size_mapped),
+        show.legend = FALSE,
+        fill = "black", color = "black", stroke = 0.55
+      ) +
+      scale_size_identity() +
+      scale_shape_manual(values = c(triangle = 24, square = 22, circle = 21)) +
+      scale_edge_color_manual(values = edge_cols) +
+      labs(title = title) +
+      theme_void() +
+      theme(
+        plot.title   = element_text(size = base_pt, face = "bold", hjust = 0),
+        plot.margin  = margin(6, 6, 6, 6),
+        panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+      )
   }
 
-#################################################
-#   Process Role Analysis Results For Figure    #
-#################################################
+################################################
+#   PROCESS ROLE ANALYSIS RESULTS FOR FIGURE   #
+################################################
 
 # Create Dataframe For Each Village
   man_summary_df <- create_combined_summary_df(
@@ -352,9 +357,9 @@
 # Combine All Villages Into One Dataframe
   all_villages_summary_df <- bind_rows(man_summary_df, sara_summary_df, andat_summary_df)
 
-#########################################################
-#   Hardcode Role Adjacency Matrices For Blockmodels    #  
-#########################################################
+######################################################
+#   HARDCODE ADJACENCY MATRICES FOR EACH BLOCKMODEL  #  
+######################################################
   
 #	Village A Matrices (8x8)
   A_fohp <- matrix(c(
@@ -464,9 +469,9 @@
   ), 4, 4, byrow = TRUE)
   rownames(C_ft) <- colnames(C_ft) <- as.character(1:4)
 
-###########################
-#   Add Node Attributes   #
-###########################
+##########################
+#   ADD NODE ATTRIBUTES  #
+##########################
   
 #	Node Tables With Sample Sizes
   nodes_A <- tibble(
@@ -493,28 +498,17 @@
 #	Global Node Size Mapping
   .all_n <- c(nodes_A$n, nodes_B$n, nodes_C$n)
   .map_node_size <- function(n, to = c(5, 14), pow = 0.8) {
-  #	"""
-  #	Args:
-  #		n: numeric vector of sample sizes
-  #		to: target range for rescaling (default c(5, 14))
-  #		pow: power transformation (default 0.8)
-  #	Returns:
-  #		numeric vector of mapped sizes
-  #	Notes:
-  #		Applies power transform then rescales to target range
-  #		based on global min/max from all villages.
-  #	"""
   
-  #	Transform values
-  v_all <- .all_n^pow
-  v     <- n^pow
-  
-  #	Rescale to target range
-  scales::rescale(v, to = to, from = range(v_all, na.rm = TRUE))
+    #	Transform values
+      v_all <- .all_n^pow
+      v     <- n^pow
+    
+    #	Rescale to target range
+      scales::rescale(v, to = to, from = range(v_all, na.rm = TRUE))
 }
 
 #################################
-#   Generate Network Figures    #
+#   GENERATE NETWORK FIGURES    #
 #################################
 
 #	Edge colors
@@ -525,79 +519,6 @@
     "Free Time"      = dark2[3]
   )
 
-#	Plot Network with Algorithmic Layout
-  plot_network_algorithmic <- function(graph, title,
-                                       layout_algo   = "fr",
-                                       seed          = 42,
-                                       niter         = 1200,
-                                       fan_strength  = 0.75,
-                                       drop_isolates = TRUE,
-                                       cap_quantile  = 0.20,
-                                       cap_fudge     = 0.25) {
-    #	"""
-    #	Args:
-    #		graph: tbl_graph object
-    #		title: plot title string
-    #		layout_algo: layout algorithm ("fr" or "kk")
-    #		seed: random seed for layout
-    #		niter: number of layout iterations
-    #		fan_strength: curve strength for parallel edges
-    #		drop_isolates: whether to remove isolated nodes
-    #		cap_quantile: quantile for arrow cap distance
-    #		cap_fudge: additional cap padding (mm)
-    #	Returns:
-    #		ggplot object
-    #	Notes:
-    #		Uses force-directed layout with adaptive arrow positioning.
-    #	"""
-    
-    #	Filter isolates if requested
-    g <- graph
-    if (drop_isolates) {
-      g <- g %>% activate(nodes) %>% filter(!node_is_isolated())
-    }
-    
-    #	Compute arrow cap distance
-    sizes <- g %>% activate(nodes) %>% as_tibble() %>% pull(size_mapped)
-    sizes <- sizes[is.finite(sizes)]
-    if (!length(sizes)) sizes <- 6
-    
-    diam_ref <- as.numeric(quantile(sizes, probs = cap_quantile, names = FALSE, type = 7))
-    cap_mm   <- (diam_ref / 2) + cap_fudge
-    cap_mm   <- max(cap_mm, 1.6)
-    start_mm <- max(cap_mm * 0.65, 1)
-    
-    #	Create plot
-    set.seed(seed)
-    ggraph(g, layout = layout_algo, niter = niter) +
-      geom_edge_fan(
-        aes(color = type),
-        show.legend = FALSE,
-        arrow      = arrow(length = unit(2.4, "mm"), type = "closed"),
-        start_cap  = circle(start_mm, "mm"),
-        end_cap    = circle(cap_mm,  "mm"),
-        lineend    = "round",
-        width      = 1.05,
-        alpha      = 0.70,
-        strength   = fan_strength
-      ) +
-      geom_node_point(
-        aes(shape = shape, size = size_mapped),
-        show.legend = FALSE,
-        fill = "black", color = "black", stroke = 0.55
-      ) +
-      scale_size_identity() +
-      scale_shape_manual(values = c(triangle = 24, square = 22, circle = 21)) +
-      scale_edge_color_manual(values = edge_cols) +
-      labs(title = title) +
-      theme_void() +
-      theme(
-        plot.title   = element_text(size = base_pt, face = "bold", hjust = 0),
-        plot.margin  = margin(6, 6, 6, 6),
-        panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
-      )
-}
-
 #	Construct village graphs
   g_a <- build_village_graph(A_fhp, A_fhr, A_fohp, A_fohr, A_ft, nodes_A)
   g_b <- build_village_graph(B_fhp, B_fhr, B_fohp, B_fohr, B_ft, nodes_B)
@@ -605,7 +526,7 @@
 
 #	Generate network plots
   layout_algo <- "fr"
-  pA <- plot_network_algorithmic(g_a, "A. Village A Blockmodel", layout_algo = layout_algo)
+  pA <- plot_network_algorithmic(g_a, "A) Village A Blockmodel", layout_algo = layout_algo)
   pB <- plot_network_algorithmic(g_b, "Village B Blockmodel",    layout_algo = layout_algo)
   pC <- plot_network_algorithmic(g_c, "Village C Blockmodel",    layout_algo = layout_algo)
 
@@ -625,7 +546,7 @@
                  size = legend_txt_mm, fontface = "bold", hjust = 0, family = font_family) +
         annotate("point", x = 0.8, y = 3.95, shape = 22, size = 6.0,
                  fill = "black", color = "black", stroke = 0.4) +
-        annotate("text",  x = 1.08, y = 3.95, label = "Core (square)",
+        annotate("text",  x = 1.08, y = 3.95, label = "Hangers-On (square)",
                  size = legend_txt_mm, fontface = "bold", hjust = 0, family = font_family) +
         annotate("point", x = 0.8, y = 3.45, shape = 21, size = 6.0,
                  fill = "black", color = "black", stroke = 0.4) +
@@ -672,7 +593,7 @@
         theme(plot.margin = margin(6, 8, 6, 8))
 
 #######################################
-#   Triad And Centrality Summaries    #
+#   TRIAD AND CENTRALITY SUMMARIES    #
 #######################################
   
 #	Extract village-level summaries
@@ -719,8 +640,8 @@
               size = txt_mm, color = "black", fontface = "bold", family = font_family) +
     scale_fill_gradient2(low = "#313695", mid = "#ffffbf", high = "#a50026",
                          midpoint = 0, limits = c(-1.5, 1.5), name = "Z-score") +
-    scale_y_discrete(labels = c("Periphery","Core","Popular")) +
-    labs(title = "B. Triad Position Frequencies (Standardized)", x = NULL, y = NULL) +
+    scale_y_discrete(labels = c("Periphery","Hangers-On","Popular")) +
+    labs(title = "B) Triad Position Frequencies (Standardized)", x = NULL, y = NULL) +
     theme_minimal(base_family = font_family, base_size = base_pt) +
     guides(
       fill = guide_colourbar(
@@ -733,7 +654,7 @@
     ) +
     theme(
       plot.title        = element_text(size = base_pt, face = "bold", hjust = 0, colour = "black"),
-      axis.text.x       = element_text(angle = 0, hjust = 0.5, size = base_pt, face = "bold", colour = "black"),
+      axis.text.x       = element_text(angle = 10, hjust = 0.8, size = base_pt, face = "bold", colour = "black"),
       axis.text.y       = element_text(size = base_pt, face = "bold", colour = "black"),
       legend.position   = "right",
       legend.title      = element_text(size = legend_pt, face = "bold", colour = "black"),
@@ -748,16 +669,15 @@
 #	Aggregate Centrality Measures
   centrality_matrix <- all_villages_centrality %>%
     mutate(measure = trimws(measure)) %>%
-    filter(measure %in% c("Total Degree","Betweenness","Eigen Centrality","Closeness Out")) %>%
+    filter(measure %in% c("Total Degree","Betweenness", "Closeness Out")) %>%
     mutate(
       measure_label = recode(
         measure,
         "Total Degree"     = "Degree",
         "Betweenness"      = "Betweenness",
-        "Eigen Centrality" = "Eigenvector",
         "Closeness Out"    = "Closeness"
       ),
-      measure_label = factor(measure_label, levels = c("Degree","Betweenness","Eigenvector","Closeness"))
+      measure_label = factor(measure_label, levels = c("Degree","Betweenness","Closeness"))
     ) %>%
     group_by(group, measure_label) %>%
     summarise(
@@ -777,8 +697,8 @@
               size = txt_mm, color = "black", fontface = "bold", family = font_family) +
     scale_fill_gradient2(low = "#313695", mid = "#ffffbf", high = "#a50026",
                          midpoint = 0, limits = c(-1.5, 1.5), name = "Z-score") +
-    scale_y_discrete(labels = c("Periphery","Core","Popular")) +
-    labs(title = "C. Centrality Scores (Standardized)", x = NULL, y = NULL) +
+    scale_y_discrete(labels = c("Periphery","Hangers-On","Popular")) +
+    labs(title = "C) Centrality Scores (Standardized)", x = NULL, y = NULL) +
     theme_minimal(base_family = font_family, base_size = base_pt) +
     guides(
       fill = guide_colourbar(
@@ -791,7 +711,7 @@
     ) +
     theme(
       plot.title        = element_text(size = base_pt, face = "bold", hjust = 0, colour = "black"),
-      axis.text.x       = element_text(angle = 0, hjust = 0.5, size = base_pt, face = "bold", colour = "black"),
+      axis.text.x       = element_text(angle = 10, hjust = 0.8, size = base_pt, face = "bold", colour = "black"),
       axis.text.y       = element_text(size = base_pt, face = "bold", colour = "black"),
       legend.position   = "right",
       legend.title      = element_text(size = legend_pt, face = "bold", colour = "black"),
@@ -804,14 +724,14 @@
     )
 
 #############################
-#   Assemble Final Figure   #
+#   ASSEMBLE FINAL FIGURE   #
 #############################
   
 #	Top Panel: Networks + Legend
   p_networks <- (pA | pB | pC | p_legend) +
     plot_layout(widths = c(0.9, 0.9, 0.9, 0.65)) +
     plot_annotation(
-      title = "A. Village Blockmodels",
+      title = "A) Village Blockmodels",
       theme = theme(
         plot.title = element_text(size = base_pt, face = "bold", hjust = 0, family = font_family)
       )
@@ -827,7 +747,8 @@
   print(final_plot)
 
 # Save Output
-ggsave("role_summary.png", plot = final_plot,
-       width = 43, height = 20, units = "in", dpi = 300, bg = "white")
+# ggsave("role_summary2.png", plot = final_plot,
+#        width = 52, height = 25, units = "in", dpi = 300, bg = "white",
+#        limitsize = FALSE)
   
   
