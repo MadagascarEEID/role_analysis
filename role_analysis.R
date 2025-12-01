@@ -68,20 +68,22 @@
   calculate_centrality <- function(network) {
     # Create distance weights for betweenness and closeness (invert the strength weights)
     # Using 1/weight transformation since weights range from 1-5
-      E(network)$weight_distance <- 1 / E(network)$weight
+      igraph::E(network)$weight_distance <- 1 / igraph::E(network)$weight
     
     data.frame(
       social_netid = V(network)$name,
-      weighted_degree = strength(network, mode = "total", weights = E(network)$weight),  # Weighted degree
-      betweenness = betweenness(network, 
+      weighted_degree = igraph::strength(network,
+                                         mode = "total",
+                                         weights = igraph::E(network)$weight),  # Weighted degree
+      betweenness = igraph::betweenness(network, 
                                 directed = TRUE, 
-                                weights = E(network)$weight_distance),  # Uses inverted weights
-      eigenvector = eigen_centrality(network, 
+                                weights = igraph::E(network)$weight_distance),  # Uses inverted weights
+      eigenvector = igraph::eigen_centrality(network, 
                                      directed = TRUE, 
-                                     weights = E(network)$weight)$vector,  # Uses original weights
-      closeness = closeness(network, 
+                                     weights = igraph::E(network)$weight)$vector,  # Uses original weights
+      closeness = igraph::closeness(network, 
                             mode = "total", 
-                            weights = E(network)$weight_distance)  # Uses inverted weights
+                            weights = igraph::E(network)$weight_distance)  # Uses inverted weights
     )
   }
   
@@ -516,7 +518,9 @@
     V(andatsakala_net)$strength <- strength(andatsakala_net)
     
   # Define Edge Weights
-    unique_weights <- sort(unique(E(mandena_net)$weight))
+    unique_weights_mandena <- sort(unique(igraph::E(mandena_net)$weight))
+    unique_weights_sarahandrano <- sort(unique(igraph::E(sarahandrano_net)$weight))
+    unique_weights_andatsakala <- sort(unique(igraph::E(andatsakala_net)$weight))
   
   # Create Plots
     plot_mandena <- ggraph(mandena_net, layout = "stress") +  
@@ -526,7 +530,7 @@
       geom_node_point(aes(size = strength), color = "darkred") +  
       scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
       scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                 values = scales::rescale(unique_weights), 
+                                 values = scales::rescale(unique_weights_mandena), 
                                  name = "Edge Weight") +  
       guides(size = guide_legend(order = 1), 
              color = guide_colorbar(order = 2)) +
@@ -545,7 +549,7 @@
         geom_node_point(aes(size = strength), color = "darkred") +  
         scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
         scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                   values = scales::rescale(unique_weights), 
+                                   values = scales::rescale(unique_weights_sarahandrano), 
                                    name = "Edge Weight") +  
         guides(size = guide_legend(order = 1), 
                color = guide_colorbar(order = 2)) +
@@ -564,7 +568,7 @@
         geom_node_point(aes(size = strength), color = "darkred") +  
         scale_size_continuous(range = c(1, 8), name = "Weighted Degree Centrality") +  
         scale_edge_color_gradientn(colors = c("darkgray", "dodgerblue", "navy"), 
-                                   values = scales::rescale(unique_weights), 
+                                   values = scales::rescale(unique_weights_andatsakala), 
                                    name = "Edge Weight") +
         guides(size = guide_legend(order = 1), 
                color = guide_colorbar(order = 2)) +
@@ -1010,6 +1014,9 @@ model_df_1 <- na.omit(model_df_1)
 #	Trace Rank Plots
   trankplot(m1, pars = c("b_core", "b_popular", "a", "sigma_v"))
   
+#	Extract Posterior Samples
+  post <- extract.samples(m1)
+  
 #	Check Random Effects
   virus_effects <- data.frame(
     virus_id = 1:length(post$v[1,]),
@@ -1031,6 +1038,17 @@ model_df_1 <- na.omit(model_df_1)
     ) +
     theme_minimal()
   print(p_virus)
+  
+#	Compute Group-Specific Probabilities
+  #	Log-odds for each group
+    mu.periphery <- post$a
+    mu.core <- post$a + post$b_core
+    mu.popular <- post$a + post$b_popular
+  
+  #	Convert to probability scale
+    p.periphery <- inv_logit(mu.periphery)
+    p.core <- inv_logit(mu.core)
+    p.popular <- inv_logit(mu.popular)  
   
 #	Posterior Predictive Check
   #	Calculate Observed Exposure Rates
@@ -1078,20 +1096,6 @@ model_df_1 <- na.omit(model_df_1)
     theme_minimal() +
     theme(legend.position = "bottom")
   print(p_pred)
-
-#	Extract Posterior Samples
-  post <- extract.samples(m1)
-
-#	Compute Group-Specific Probabilities
-  #	Log-odds for each group
-    mu.periphery <- post$a
-    mu.core <- post$a + post$b_core
-    mu.popular <- post$a + post$b_popular
-  
-  #	Convert to probability scale
-    p.periphery <- inv_logit(mu.periphery)
-    p.core <- inv_logit(mu.core)
-    p.popular <- inv_logit(mu.popular)
 
 #	Compute Pairwise Differences
   #	Core vs Periphery
