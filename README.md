@@ -1,7 +1,7 @@
 # Role Analysis
 
 Public code for the manuscript: Tyler M. Barrett, Charles Kevin Tiu, Kayla Kauffman, Michelle Pender, Jean Yves Rabezara, Prisca Rahary, Lin-Fa Wang, Randall A. Kramer, Voahangy Soarimalala, Peter J. Mucha, James Moody, Charles L. Nunn. Identifying Social-Epidemiological Roles Associated with Viral Expousre Using Regular Equivalence Blockmodeling.
-[medRxiv preprint](https://www.medrxiv.org/content/10.1101/2025.11.05.25339611v1).
+[medRxiv preprint](https://www.medrxiv.org/content/10.1101/2025.11.05.25339611v2).
 
 ## role_analysis.R
 
